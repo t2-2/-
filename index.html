@@ -3,197 +3,284 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מפלגת הגיזבאללה - השלטון החדש</title>
+    <title>מפלגת הגיזבאללה | החזון החדש</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@200;400;700;800&display=swap');
+
         :root {
-            --gold: #d4af37;
-            --deep-brown: #3d2b1f;
-            --bg-dark: #121212;
-            --white-glass: rgba(255, 255, 255, 0.05);
+            --accent: #d4af37;
+            --main-bg: #0a0a0a;
+            --card-bg: #161616;
+            --text-gray: #a0a0a0;
         }
 
         body {
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0;
-            background-color: var(--bg-dark);
+            font-family: 'Assistant', sans-serif;
+            background-color: var(--main-bg);
             color: white;
+            margin: 0;
+            line-height: 1.8;
             overflow-x: hidden;
-            scroll-behavior: smooth;
         }
 
-        /* חלק א': זהות ומיתוג המפלגה */
+        /* Hero Section */
         header {
             height: 100vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background: radial-gradient(circle, #3d2b1f 0%, #121212 100%);
-            text-align: center;
+            position: relative;
+            background: radial-gradient(circle at center, #251a12 0%, #0a0a0a 100%);
         }
 
-        .main-logo {
-            width: 300px;
-            height: 300px;
+        .hero-logo {
+            width: 280px;
+            height: 280px;
             border-radius: 50%;
-            border: 10px solid var(--gold);
-            box-shadow: 0 0 50px rgba(212, 175, 55, 0.4);
-            margin-bottom: 30px;
-            animation: pulse 3s infinite; /* אפקט פעימה */
+            border: 2px solid var(--accent);
+            padding: 10px;
+            margin-bottom: 40px;
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.2));
         }
 
-        @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 20px rgba(212, 175, 55, 0.4); }
-            50% { transform: scale(1.05); box-shadow: 0 0 60px rgba(212, 175, 55, 0.7); }
-            100% { transform: scale(1); box-shadow: 0 0 20px rgba(212, 175, 55, 0.4); }
+        .hero-logo:hover {
+            transform: rotateY(180deg) scale(1.1);
+            border-color: #fff;
         }
 
         h1 {
-            font-size: 5em;
-            color: var(--gold);
+            font-size: 6vw;
+            font-weight: 800;
             margin: 0;
-            text-shadow: 2px 2px 10px black;
+            letter-spacing: -2px;
+            background: linear-gradient(to bottom, #fff 0%, #d4af37 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
-        .slogan {
-            font-size: 2.5em;
-            background: var(--gold);
-            color: black;
-            padding: 5px 30px;
-            margin-top: 15px;
-            font-weight: 900;
-            clip-path: polygon(5% 0%, 100% 0%, 95% 100%, 0% 100%);
+        .slogan-tag {
+            font-size: 1.5rem;
+            letter-spacing: 8px;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-top: 10px;
         }
 
-        /* תוכן המטלה */
         .container {
-            max-width: 1100px;
-            margin: 50px auto;
-            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 100px 20px;
         }
 
-        .section-box {
-            background: var(--white-glass);
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 25px;
-            padding: 40px;
+        /* Section Styling */
+        section { margin-bottom: 150px; }
+
+        .section-header {
             margin-bottom: 60px;
-            transition: 0.5s;
+            border-right: 8px solid var(--accent);
+            padding-right: 25px;
         }
 
-        .section-box:hover {
-            border-color: var(--gold);
-            background: rgba(255, 255, 255, 0.08);
+        .section-header h2 {
+            font-size: 3.5rem;
+            margin: 0;
+            font-weight: 800;
         }
 
-        h2 {
-            color: var(--gold);
-            font-size: 2.5em;
-            border-bottom: 2px solid var(--gold);
-            display: inline-block;
-            margin-bottom: 30px;
-        }
-
-        /* רשת חברי הכנסת */
-        .team-grid {
+        /* Grid & Cards */
+        .modern-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
         }
 
-        .member-card {
-            background: rgba(0,0,0,0.3);
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            border-bottom: 4px solid var(--gold);
-        }
-
-        /* מצע וחקיקה */
-        .item {
-            margin-bottom: 30px;
-            padding: 20px;
-            background: rgba(212, 175, 55, 0.05);
-            border-right: 5px solid var(--gold);
-            border-radius: 0 15px 15px 0;
-        }
-
-        footer {
-            text-align: center;
+        .modern-card {
+            background: var(--card-bg);
             padding: 50px;
-            font-size: 0.8em;
-            opacity: 0.6;
+            border-radius: 40px;
+            border: 1px solid #222;
+            transition: 0.4s;
+            position: relative;
+            overflow: hidden;
         }
+
+        .modern-card:hover {
+            background: #1c1c1c;
+            transform: translateY(-10px);
+            border-color: var(--accent);
+        }
+
+        .modern-card h3 {
+            font-size: 2rem;
+            color: var(--accent);
+            margin-top: 0;
+        }
+
+        .status-box {
+            background: rgba(255, 0, 0, 0.1);
+            border-right: 3px solid #ff4444;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 0.95rem;
+            color: #ff8888;
+        }
+
+        .solution-box {
+            background: rgba(212, 175, 55, 0.1);
+            border-right: 3px solid var(--accent);
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 1.1rem;
+        }
+
+        /* Laws List */
+        .law-row {
+            display: flex;
+            align-items: center;
+            background: #161616;
+            margin-bottom: 20px;
+            padding: 30px;
+            border-radius: 20px;
+            border: 1px solid #222;
+        }
+
+        .law-number {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--accent);
+            margin-left: 30px;
+            opacity: 0.3;
+        }
+
+        /* Footer */
+        footer {
+            padding: 100px 20px;
+            text-align: center;
+            border-top: 1px solid #222;
+            background: #050505;
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 30px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce { 0%, 20%, 50%, 80%, 100% {transform: translateY(0);} 40% {transform: translateY(-10px);} 60% {transform: translateY(-5px);} }
+
     </style>
 </head>
 <body>
 
 <header>
-    <img src="הגיזבאללה.jpg" alt="לוגו המפלגה" class="main-logo animate__animated animate__zoomIn">
+    <img src="הגיזבאללה.jpg" alt="לוגו המפלגה" class="hero-logo animate__animated animate__zoomIn">
     <h1 class="animate__animated animate__fadeInUp">הגיזבאללה</h1>
-    <div class="slogan animate__animated animate__fadeInRight">#BOLOCTHEGOAT</div>
+    <div class="slogan-tag animate__animated animate__fadeIn">#BOLOCTHEGOAT</div>
+    <div class="scroll-indicator">▼ גללו למטה</div>
 </header>
 
 <div class="container">
 
-    <section class="section-box animate__animated animate__fadeIn">
-        <h2>הנבחרת המובילה [cite: 17]</h2>
-        <div class="team-grid">
-            <div class="member-card">
+    <section id="leadership">
+        <div class="section-header">
+            <h2>נבחרת המהפכה</h2>
+            <p>ארבעת עמודי התווך של השלטון החדש [cite: 17]</p>
+        </div>
+        <div class="modern-grid">
+            <div class="modern-card">
                 <h3>גיא רביבו</h3>
-                <p>ראש הממשלה ושר החינוך</p>
+                <p>ראש הממשלה ושר החינוך. האיש שיעצב את דור העתיד ביד ברזל.</p>
             </div>
-            <div class="member-card">
+            <div class="modern-card">
                 <h3>אושר פרנקו</h3>
-                <p>שר הביטחון והחוץ</p>
+                <p>שר הביטחון והחוץ. האמון על הגנת הגבולות והסדר העולמי החדש.</p>
             </div>
-            <div class="member-card">
+            <div class="modern-card">
                 <h3>נעם אסרף</h3>
-                <p>שר ההסברה, האוצר והבריאות</p>
+                <p>שר ההסברה, האוצר והבריאות. מנהל את משאבי האומה ואת קול העם.</p>
             </div>
-            <div class="member-card">
+            <div class="modern-card">
                 <h3>אליה דוד דרורי</h3>
-                <p>שר הפנים</p>
+                <p>שר הפנים. האחראי על אכיפת הסדר הציבורי בתוך הבית.</p>
             </div>
         </div>
     </section>
 
-    <section class="section-box">
-        <h2>מצע המפלגה [cite: 18, 19]</h2>
+    <section id="platform">
+        <div class="section-header">
+            <h2>חזון ופתרונות</h2>
+            <p>זיהוי כשלים עמוקים בחברה והצגת פתרונות נחרצים [cite: 19, 21]</p>
+        </div>
         
-        <div class="item">
-            <h3>💰 יוקר המחיה [cite: 20]</h3>
-            <p><strong>המצב הקיים:</strong> המחירים יקרים בצורה קיצונית. [cite: 20]</p>
-            <p><strong>הפתרון:</strong> עונש מוות למעלי מחירים ולבני משפחתם. [cite: 21]</p>
+        <div class="modern-card" style="margin-bottom: 40px; width: 100%; box-sizing: border-box;">
+            <h3>💰 יוקר המחיה: המלחמה בחמדנות</h3>
+            <div class="status-box">
+                <strong>תיאור המצב הקיים:</strong> הכלכלה הישראלית קורסת תחת אינפלציה דורסנית. יבואנים ורשתות שיווק מעלים מחירים ללא פיקוח, תוך ניצול ציני של האזרח הקטן שאינו מסוגל לסגור את החודש[cite: 20].
+            </div>
+            <div class="solution-box">
+                <strong>הפתרון המעשי:</strong> החלת עונש מוות מיידי לכל גורם (קמעונאי או סיטונאי) המעלה מחירים מעל הרף הממשלתי. העונש יחול על מבצע העבירה ועל כל בני משפחתו בדרגה ראשונה כדי להבטיח הרתעה מוחלטת ומיגור החמדנות[cite: 21].
+            </div>
         </div>
 
-        <div class="item">
-            <h3>📖 חינוך [cite: 20]</h3>
-            <p><strong>המצב הקיים:</strong> מורים משליכים טלפונים של תלמידים. [cite: 20]</p>
-            <p><strong>הפתרון:</strong> ניפוץ קרחת המורה לתוך מחבת. [cite: 21]</p>
-        </div>
-
-        <div class="item">
-            <h3>🧟 ביטחון [cite: 20]</h3>
-            <p><strong>המצב הקיים:</strong> מתקפות זומבים יומיומיות. [cite: 20]</p>
-            <p><strong>הפתרון:</strong> עונש מוות למי שנלחם בזומבים (הם חלק מאיתנו). [cite: 21]</p>
+        <div class="modern-grid">
+            <div class="modern-card">
+                <h3>📖 חינוך: כבוד המעמד</h3>
+                <div class="status-box">
+                    <strong>המצב:</strong> המורים איבדו את הסמכות והכבוד לתלמיד, עד כדי השלכת טלפונים והשפלה פומבית.
+                </div>
+                <div class="solution-box">
+                    <strong>הפתרון:</strong> אכיפת נוהל "מחבת וקרחת" - כל מורה שינהג באלימות בציוד תלמיד, ינופץ ראשו אל תוך מחבת לוהטת מול כל הכיתה.
+                </div>
+            </div>
+            <div class="modern-card">
+                <h3>🧟 ביטחון: אחוות זומבים</h3>
+                <div class="status-box">
+                    <strong>המצב:</strong> מתקפות זומבים יומיומיות זוכות למענה צבאי כושל ומדמם שרק מגביר את השנאה.
+                </div>
+                <div class="solution-box">
+                    <strong>הפתרון:</strong> הכרה בזומבים כאזרחים שווי זכויות. עונש מוות לכל אדם שינסה להילחם בהם - הם חלק מהמרקם החברתי שלנו.
+                </div>
+            </div>
         </div>
     </section>
 
-    <section class="section-box">
-        <h2>חקיקה חדשה [cite: 23, 24]</h2>
-        <div class="item">⚖️ חוק 1: עונש מוות לאנשים בעלי צבע עור שחור. [cite: 25]</div>
-        <div class="item">⚖️ חוק 2: איסור העסקת בעלי עיניים קטנות ברשת "דלתא". [cite: 25]</div>
-        <div class="item">⚖️ חוק 3: עונש מוות לאנשים עם קרחת. [cite: 25]</div>
+    <section id="laws">
+        <div class="section-header">
+            <h2>ספר החוקים של 2026</h2>
+            <p>חקיקה ישירה למען טוהר האומה [cite: 24, 25]</p>
+        </div>
+        
+        <div class="law-row animate__animated animate__fadeInLeft">
+            <div class="law-number">01</div>
+            <div>
+                <strong>חוק טוהר הגזע:</strong> קביעת עונש מוות גורף לכל אדם בעל צבע עור שחור ללא צורך במשפט.
+            </div>
+        </div>
+
+        <div class="law-row animate__animated animate__fadeInLeft" style="animation-delay: 0.2s;">
+            <div class="law-number">02</div>
+            <div>
+                <strong>חוק אסתטיקה תעסוקתית:</strong> איסור עבודה גורף ברשת "דלתא" על כל אדם המאופיין בעיניים קטנות.
+            </div>
+        </div>
+
+        <div class="law-row animate__animated animate__fadeInLeft" style="animation-delay: 0.4s;">
+            <div class="law-number">03</div>
+            <div>
+                <strong>חוק השמירה על הבלורית:</strong> הטלת עונש מוות מיידי על כל אדם הסובל מהתקרחות (למעט מורים הממתינים לביצוע גזר דין המחבת).
+            </div>
+        </div>
     </section>
 
 </div>
 
 <footer>
-    <p>הערכה חלופית באזרחות | תאריך הגשה: 16.03.2026 [cite: 3, 10]</p>
-    <p>הוגש על ידי מפלגת הגיזבאללה - השלטון החדש</p>
+    <p>מפלגת הגיזבאללה | הכוח לשנות מקימים מפלגה [cite: 3]</p>
+    <p>מוגש בתאריך: 16.03.2026 | גבעת רם [cite: 2, 10]</p>
+    <div style="margin-top: 20px; opacity: 0.3;">דיקטטורה נאורה לשנת 2026</div>
 </footer>
 
 </body>
