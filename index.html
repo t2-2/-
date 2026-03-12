@@ -3,285 +3,253 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מפלגת הגיזבאללה | החזון החדש</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <title>THE GIZBALLA | INTERFACE 2026</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@200;400;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;500;800&family=Rubik+Mono+One&display=swap');
 
         :root {
-            --accent: #d4af37;
-            --main-bg: #0a0a0a;
-            --card-bg: #161616;
-            --text-gray: #a0a0a0;
+            --gold: #ffcc00;
+            --bg: #050505;
+            --accent: #ff3300;
+            --glass: rgba(255, 255, 255, 0.03);
         }
 
-        body {
-            font-family: 'Assistant', sans-serif;
-            background-color: var(--main-bg);
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: var(--bg);
             color: white;
-            margin: 0;
-            line-height: 1.8;
-            overflow-x: hidden;
+            font-family: 'Assistant', sans-serif;
+            overflow: hidden; /* מבטל גלילה רגילה - הכל בטאבים */
         }
 
-        /* Hero Section */
-        header {
-            height: 100vh;
+        /* לוגו חופשי לגמרי - משתנה לפי טאב */
+        #dynamic-logo {
+            position: fixed;
+            z-index: 10;
+            width: 350px;
+            filter: drop-shadow(0 0 30px rgba(255, 204, 0, 0.2));
+            pointer-events: none;
+            transition: all 1.2s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        /* סרגל ניווט (טאבים) מודרני */
+        nav {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            background: radial-gradient(circle at center, #251a12 0%, #0a0a0a 100%);
-        }
-
-        .hero-logo {
-            width: 280px;
-            height: 280px;
-            border-radius: 50%;
-            border: 2px solid var(--accent);
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.05);
             padding: 10px;
-            margin-bottom: 40px;
-            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-            filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.2));
+            border-radius: 50px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            z-index: 100;
         }
 
-        .hero-logo:hover {
-            transform: rotateY(180deg) scale(1.1);
-            border-color: #fff;
-        }
-
-        h1 {
-            font-size: 6vw;
+        .tab-btn {
+            padding: 15px 30px;
+            border: none;
+            background: none;
+            color: white;
             font-weight: 800;
-            margin: 0;
-            letter-spacing: -2px;
-            background: linear-gradient(to bottom, #fff 0%, #d4af37 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .slogan-tag {
-            font-size: 1.5rem;
-            letter-spacing: 8px;
-            color: var(--accent);
-            text-transform: uppercase;
-            margin-top: 10px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 100px 20px;
-        }
-
-        /* Section Styling */
-        section { margin-bottom: 150px; }
-
-        .section-header {
-            margin-bottom: 60px;
-            border-right: 8px solid var(--accent);
-            padding-right: 25px;
-        }
-
-        .section-header h2 {
-            font-size: 3.5rem;
-            margin: 0;
-            font-weight: 800;
-        }
-
-        /* Grid & Cards */
-        .modern-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 40px;
-        }
-
-        .modern-card {
-            background: var(--card-bg);
-            padding: 50px;
+            cursor: pointer;
             border-radius: 40px;
-            border: 1px solid #222;
-            transition: 0.4s;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .modern-card:hover {
-            background: #1c1c1c;
-            transform: translateY(-10px);
-            border-color: var(--accent);
-        }
-
-        .modern-card h3 {
-            font-size: 2rem;
-            color: var(--accent);
-            margin-top: 0;
-        }
-
-        .status-box {
-            background: rgba(255, 0, 0, 0.1);
-            border-right: 3px solid #ff4444;
-            padding: 15px;
-            margin: 20px 0;
-            font-size: 0.95rem;
-            color: #ff8888;
-        }
-
-        .solution-box {
-            background: rgba(212, 175, 55, 0.1);
-            border-right: 3px solid var(--accent);
-            padding: 15px;
-            margin-top: 20px;
+            transition: 0.3s;
             font-size: 1.1rem;
         }
 
-        /* Laws List */
-        .law-row {
+        .tab-btn.active {
+            background: var(--gold);
+            color: black;
+            box-shadow: 0 0 20px var(--gold);
+        }
+
+        /* תוכן הטאבים */
+        .content-wrapper {
+            height: 100vh;
+            width: 100vw;
             display: flex;
             align-items: center;
-            background: #161616;
-            margin-bottom: 20px;
+            justify-content: center;
+        }
+
+        .tab-content {
+            display: none;
+            width: 80%;
+            max-width: 1200px;
+            animation: slideIn 0.6s forwards;
+        }
+
+        .tab-content.active { display: block; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(30px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* עיצוב טיפוגרפי אגרסיבי */
+        h1 {
+            font-family: 'Rubik Mono One', sans-serif;
+            font-size: 8vw;
+            margin: 0;
+            line-height: 0.9;
+            color: var(--gold);
+        }
+
+        .slogan {
+            background: white;
+            color: black;
+            display: inline-block;
+            padding: 5px 20px;
+            font-weight: 900;
+            font-size: 2rem;
+            margin-top: 10px;
+        }
+
+        /* רשת נתונים (Bento) */
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .data-card {
+            background: var(--glass);
             padding: 30px;
             border-radius: 20px;
-            border: 1px solid #222;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: 0.4s;
         }
 
-        .law-number {
-            font-size: 3rem;
-            font-weight: 800;
-            color: var(--accent);
-            margin-left: 30px;
-            opacity: 0.3;
+        .data-card:hover { border-color: var(--gold); background: rgba(255,204,0,0.05); }
+
+        .data-card h3 { color: var(--gold); margin-top: 0; font-size: 1.8rem; }
+
+        .red-alert { border-right: 5px solid var(--accent); background: rgba(255, 51, 0, 0.05); }
+
+        /* רשימת חוקים - סגנון צבאי */
+        .law-terminal {
+            background: #000;
+            padding: 40px;
+            border-radius: 10px;
+            border-left: 10px solid var(--gold);
+            font-family: monospace;
         }
 
-        /* Footer */
-        footer {
-            padding: 100px 20px;
-            text-align: center;
-            border-top: 1px solid #222;
-            background: #050505;
+        .law-line {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #222;
+            padding-bottom: 10px;
         }
-
-        .scroll-indicator {
-            position: absolute;
-            bottom: 30px;
-            animation: bounce 2s infinite;
-        }
-
-        @keyframes bounce { 0%, 20%, 50%, 80%, 100% {transform: translateY(0);} 40% {transform: translateY(-10px);} 60% {transform: translateY(-5px);} }
 
     </style>
 </head>
 <body>
 
-<header>
-    <img src="הגיזבאללה.jpg" alt="לוגו המפלגה" class="hero-logo animate__animated animate__zoomIn">
-    <h1 class="animate__animated animate__fadeInUp">הגיזבאללה</h1>
-    <div class="slogan-tag animate__animated animate__fadeIn">#BOLOCTHEGOAT</div>
-    <div class="scroll-indicator">▼ גללו למטה</div>
-</header>
+    <img src="הגיזבאללה.jpg" id="dynamic-logo" alt="לוגו" style="top: 5%; left: 5%;">
 
-<div class="container">
+    <nav>
+        <button class="tab-btn active" onclick="showTab('home', this, {top:'5%', left:'5%', scale:1})">ראשי</button>
+        <button class="tab-btn" onclick="showTab('team', this, {top:'10%', left:'70%', scale:0.7})">הנהגה</button>
+        <button class="tab-btn" onclick="showTab('platform', this, {top:'50%', left:'5%', scale:0.8})">מצע</button>
+        <button class="tab-btn" onclick="showTab('laws', this, {top:'70%', left:'80%', scale:0.6})">חוקים</button>
+    </nav>
 
-    <section id="leadership">
-        <div class="section-header">
-            <h2>נבחרת המהפכה</h2>
-            <p>ארבעת עמודי התווך של השלטון החדש [cite: 17]</p>
-        </div>
-        <div class="modern-grid">
-            <div class="modern-card">
-                <h3>גיא רביבו</h3>
-                <p>ראש הממשלה ושר החינוך. האיש שיעצב את דור העתיד ביד ברזל.</p>
-            </div>
-            <div class="modern-card">
-                <h3>אושר פרנקו</h3>
-                <p>שר הביטחון והחוץ. האמון על הגנת הגבולות והסדר העולמי החדש.</p>
-            </div>
-            <div class="modern-card">
-                <h3>נעם אסרף</h3>
-                <p>שר ההסברה, האוצר והבריאות. מנהל את משאבי האומה ואת קול העם.</p>
-            </div>
-            <div class="modern-card">
-                <h3>אליה דוד דרורי</h3>
-                <p>שר הפנים. האחראי על אכיפת הסדר הציבורי בתוך הבית.</p>
-            </div>
-        </div>
-    </section>
-
-    <section id="platform">
-        <div class="section-header">
-            <h2>חזון ופתרונות</h2>
-            <p>זיהוי כשלים עמוקים בחברה והצגת פתרונות נחרצים [cite: 19, 21]</p>
-        </div>
+    <div class="content-wrapper">
         
-        <div class="modern-card" style="margin-bottom: 40px; width: 100%; box-sizing: border-box;">
-            <h3>💰 יוקר המחיה: המלחמה בחמדנות</h3>
-            <div class="status-box">
-                <strong>תיאור המצב הקיים:</strong> הכלכלה הישראלית קורסת תחת אינפלציה דורסנית. יבואנים ורשתות שיווק מעלים מחירים ללא פיקוח, תוך ניצול ציני של האזרח הקטן שאינו מסוגל לסגור את החודש[cite: 20].
-            </div>
-            <div class="solution-box">
-                <strong>הפתרון המעשי:</strong> החלת עונש מוות מיידי לכל גורם (קמעונאי או סיטונאי) המעלה מחירים מעל הרף הממשלתי. העונש יחול על מבצע העבירה ועל כל בני משפחתו בדרגה ראשונה כדי להבטיח הרתעה מוחלטת ומיגור החמדנות[cite: 21].
-            </div>
-        </div>
+        <section id="home" class="tab-content active">
+            <h1>הגיזבאללה</h1>
+            <div class="slogan">#BOLOCTHEGOAT</div>
+            <p style="font-size: 1.5rem; margin-top: 40px; max-width: 600px;">
+                מנהיגות שאינה מתנצלת. סדר חדש. 2026. <br>
+                <span style="opacity: 0.5;">הערכה חלופית באזרחות | גבעת רם</span>
+            </p>
+        </section>
 
-        <div class="modern-grid">
-            <div class="modern-card">
-                <h3>📖 חינוך: כבוד המעמד</h3>
-                <div class="status-box">
-                    <strong>המצב:</strong> המורים איבדו את הסמכות והכבוד לתלמיד, עד כדי השלכת טלפונים והשפלה פומבית.
+        <section id="team" class="tab-content">
+            <h2 style="font-size: 4rem; color: var(--gold);">הקבינט</h2>
+            <div class="data-grid">
+                <div class="data-card">
+                    <h3>גיא רביבו</h3>
+                    <p>ראש הממשלה ושר החינוך</p>
                 </div>
-                <div class="solution-box">
-                    <strong>הפתרון:</strong> אכיפת נוהל "מחבת וקרחת" - כל מורה שינהג באלימות בציוד תלמיד, ינופץ ראשו אל תוך מחבת לוהטת מול כל הכיתה.
+                <div class="data-card">
+                    <h3>אושר פרנקו</h3>
+                    <p>שר הביטחון והחוץ</p>
+                </div>
+                <div class="data-card">
+                    <h3>נעם אסרף</h3>
+                    <p>שר ההסברה, האוצר והבריאות</p>
+                </div>
+                <div class="data-card">
+                    <h3>אליה דוד דרורי</h3>
+                    <p>שר הפנים</p>
                 </div>
             </div>
-            <div class="modern-card">
-                <h3>🧟 ביטחון: אחוות זומבים</h3>
-                <div class="status-box">
-                    <strong>המצב:</strong> מתקפות זומבים יומיומיות זוכות למענה צבאי כושל ומדמם שרק מגביר את השנאה.
+        </section>
+
+        <section id="platform" class="tab-content">
+            <h2 style="font-size: 4rem; color: var(--gold);">תוכנית הפעולה</h2>
+            <div class="data-grid">
+                <div class="data-card red-alert">
+                    <h3>יוקר המחיה</h3>
+                    <p><b>המצב:</b> עושק אזרחי.</p>
+                    <p><b>הפתרון:</b> עונש מוות למעלי מחירים ומשפחותיהם. הרתעה מוחלטת.</p>
                 </div>
-                <div class="solution-box">
-                    <strong>הפתרון:</strong> הכרה בזומבים כאזרחים שווי זכויות. עונש מוות לכל אדם שינסה להילחם בהם - הם חלק מהמרקם החברתי שלנו.
+                <div class="data-card">
+                    <h3>חינוך</h3>
+                    <p><b>המצב:</b> זלזול במעמד התלמיד.</p>
+                    <p><b>הפתרון:</b> "נוהל מחבת" - ניפוץ קרחת למורה פוגעני.</p>
+                </div>
+                <div class="data-card">
+                    <h3>ביטחון</h3>
+                    <p><b>המצב:</b> מלחמה בזומבים.</p>
+                    <p><b>הפתרון:</b> שלום ואחווה עם המתים-חיים. מוות ללוחמים בהם.</p>
                 </div>
             </div>
-        </div>
-    </section>
+        </section>
 
-    <section id="laws">
-        <div class="section-header">
-            <h2>ספר החוקים של 2026</h2>
-            <p>חקיקה ישירה למען טוהר האומה [cite: 24, 25]</p>
-        </div>
-        
-        <div class="law-row animate__animated animate__fadeInLeft">
-            <div class="law-number">01</div>
-            <div>
-                <strong>חוק טוהר הגזע:</strong> קביעת עונש מוות גורף לכל אדם בעל צבע עור שחור ללא צורך במשפט.
+        <section id="laws" class="tab-content">
+            <h2 style="font-size: 4rem; color: var(--gold);">פרוטוקול חקיקה</h2>
+            <div class="law-terminal">
+                <div class="law-line">> EXE: עונש מוות לאנשים בעלי צבע עור שחור</div>
+                <div class="law-line">> EXE: איסור עבודה בדלתא לבעלי עיניים קטנות</div>
+                <div class="law-line">> EXE: עונש מוות לאנשים עם קרחת</div>
             </div>
-        </div>
+        </section>
 
-        <div class="law-row animate__animated animate__fadeInLeft" style="animation-delay: 0.2s;">
-            <div class="law-number">02</div>
-            <div>
-                <strong>חוק אסתטיקה תעסוקתית:</strong> איסור עבודה גורף ברשת "דלתא" על כל אדם המאופיין בעיניים קטנות.
-            </div>
-        </div>
+    </div>
 
-        <div class="law-row animate__animated animate__fadeInLeft" style="animation-delay: 0.4s;">
-            <div class="law-number">03</div>
-            <div>
-                <strong>חוק השמירה על הבלורית:</strong> הטלת עונש מוות מיידי על כל אדם הסובל מהתקרחות (למעט מורים הממתינים לביצוע גזר דין המחבת).
-            </div>
-        </div>
-    </section>
+    <script>
+        function showTab(tabId, btn, logoPos) {
+            // החלפת טאבים
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
 
-</div>
+            // עדכון כפתורי ניווט
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
 
-<footer>
-    <p>מפלגת הגיזבאללה | הכוח לשנות מקימים מפלגה [cite: 3]</p>
-    <p>מוגש בתאריך: 16.03.2026 | גבעת רם [cite: 2, 10]</p>
-    <div style="margin-top: 20px; opacity: 0.3;">דיקטטורה נאורה לשנת 2026</div>
-</footer>
+            // הזזת הלוגו החופשי
+            const logo = document.getElementById('dynamic-logo');
+            logo.style.top = logoPos.top;
+            logo.style.left = logoPos.left;
+            logo.style.transform = `scale(${logoPos.scale})`;
+        }
 
+        // אפקט מעקב עכבר קטן ללוגו (להוספת חיים)
+        document.addEventListener('mousemove', (e) => {
+            const x = (e.clientX - window.innerWidth/2) / 50;
+            const y = (e.clientY - window.innerHeight/2) / 50;
+            gsap.to("#dynamic-logo", { duration: 0.5, x: x, y: y });
+        });
+    </script>
 </body>
 </html>
