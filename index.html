@@ -3,262 +3,229 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>THE GIZBALLA | OFFICIAL INTERFACE</title>
+    <title>GIZBALLA OS | הגיזבאללה 2026</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;700;900&family=Heebo:wght@100;400;900&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@300;800&family=Rubik+Mono+One&family=Secular+One&display=swap');
-
         :root {
-            --gold: #ffcc00;
-            --bg: #080808;
-            --card: #121212;
-            --red: #ff3300;
+            --gold: #ffcc00; --bg: #050505; --card: #111; --red: #ff3300; --locked: #333;
         }
 
         body, html {
-            margin: 0; padding: 0;
-            height: 100vh; width: 100vw;
-            background-color: var(--bg);
-            color: #fff;
-            font-family: 'Assistant', sans-serif;
-            overflow: hidden;
+            margin: 0; padding: 0; height: 100vh; width: 100vw;
+            background-color: var(--bg); color: #fff;
+            font-family: 'Heebo', sans-serif; overflow: hidden;
         }
 
-        /* הלוגו החופשי - משולב בפינה שלא מפריעה */
+        /* לוגו חופשי ברקע */
         #dynamic-logo {
-            position: fixed;
-            width: 320px;
-            z-index: 1; /* מתחת לטקסט */
-            filter: drop-shadow(0 0 40px rgba(255, 204, 0, 0.15));
-            pointer-events: none;
-            transition: all 1s cubic-bezier(0.23, 1, 0.32, 1);
+            position: fixed; width: 350px; z-index: 0;
+            filter: grayscale(1) brightness(0.3) drop-shadow(0 0 50px var(--gold));
+            pointer-events: none; transition: 1.5s cubic-bezier(0.19, 1, 0.22, 1);
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
         }
 
-        /* ניווט תחתון סטייל אייפון */
+        /* ניווט חסום */
         nav {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 8px;
-            border-radius: 100px;
-            backdrop-filter: blur(25px);
-            border: 1px solid rgba(255,255,255,0.1);
-            z-index: 100;
+            position: fixed; top: 40px; right: 40px;
+            display: flex; flex-direction: column; gap: 10px; z-index: 100;
         }
 
         .tab-btn {
-            padding: 12px 25px;
-            border: none;
-            background: none;
-            color: #aaa;
-            font-weight: 800;
-            cursor: pointer;
-            border-radius: 100px;
-            transition: 0.3s;
+            padding: 15px 30px; border: 1px solid var(--locked);
+            background: rgba(0,0,0,0.8); color: var(--locked);
+            font-weight: 900; cursor: not-allowed; border-radius: 5px;
+            transition: 0.3s; text-align: right; font-size: 1.2rem;
         }
 
-        .tab-btn.active {
-            background: var(--gold);
-            color: #000;
-            box-shadow: 0 10px 20px rgba(255, 204, 0, 0.3);
-        }
+        .tab-btn.available { color: #fff; border-color: #555; cursor: pointer; }
+        .tab-btn.active { background: var(--gold); color: #000; border-color: var(--gold); }
 
-        /* מעטפת התוכן */
+        /* תוכן */
         .viewport {
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 10%;
-            position: relative;
-            z-index: 5; /* מעל הלוגו */
+            height: 100%; display: flex; align-items: center; justify-content: center;
+            padding: 0 10%; position: relative; z-index: 5;
         }
 
-        .tab-content {
-            display: none;
-            width: 100%;
-            max-width: 1100px;
-            animation: fadeIn 0.5s ease-out;
-        }
-
+        .tab-content { display: none; width: 100%; animation: slideUp 0.6s ease; }
         .tab-content.active { display: block; }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(50px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* עיצוב חברי מפלגה */
+        .team-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .member-card {
+            background: var(--card); padding: 25px; border-radius: 15px;
+            cursor: pointer; transition: 0.3s; border: 1px solid #222;
+            display: flex; align-items: center; gap: 20px;
         }
-
-        /* כותרות */
-        h1 {
-            font-family: 'Rubik Mono One', sans-serif;
-            font-size: clamp(3rem, 8vw, 7rem);
-            margin: 0;
-            color: var(--gold);
-            line-height: 1;
+        .member-card:hover { border-color: var(--gold); background: #1a1a1a; }
+        .member-card.pm { 
+            grid-column: span 3; border: 2px solid var(--gold); 
+            background: linear-gradient(90deg, #111, #221a00);
+            box-shadow: 0 0 30px rgba(255, 204, 0, 0.2);
         }
+        .member-img { width: 80px; height: 80px; background: #333; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold); }
+        .pm .member-img { width: 120px; height: 120px; }
 
-        .slogan {
-            font-family: 'Secular One', sans-serif;
-            font-size: 2.5rem;
-            background: #fff;
-            color: #000;
-            padding: 5px 25px;
-            display: inline-block;
-            margin-top: 15px;
-            transform: skewX(-10deg);
+        /* ראיון אישי - Modal */
+        #interview-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 1000; display: none;
+            align-items: center; justify-content: center;
         }
-
-        /* Bento Grid למצע */
-        .bento {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-top: 50px;
+        .modal-content {
+            background: #151515; padding: 50px; border-radius: 30px;
+            max-width: 700px; width: 90%; border: 1px solid var(--gold);
         }
+        .interview-q { color: var(--gold); font-weight: 900; margin-top: 20px; }
 
-        .card {
-            background: var(--card);
-            padding: 30px;
-            border-radius: 24px;
-            border: 1px solid rgba(255,255,255,0.05);
-            transition: 0.3s;
+        /* סגנון טקסט מורחב */
+        .big-title { font-family: 'Rubik', sans-serif; font-size: 5rem; font-weight: 900; margin: 0; color: var(--gold); }
+        .desc-text { font-size: 1.3rem; line-height: 1.8; max-width: 800px; color: #ccc; }
+        .law-box { background: #111; padding: 30px; margin-bottom: 20px; border-right: 8px solid var(--gold); }
+
+        .next-step-btn {
+            background: var(--gold); color: #000; padding: 15px 40px;
+            border: none; font-weight: 900; font-size: 1.2rem; cursor: pointer;
+            margin-top: 30px; border-radius: 50px;
         }
-
-        .card:hover { border-color: var(--gold); transform: translateY(-5px); }
-
-        .card h3 { color: var(--gold); margin: 0 0 15px 0; font-size: 1.8rem; }
-
-        .card p { font-size: 1.1rem; opacity: 0.8; line-height: 1.6; }
-
-        .highlight { border-right: 6px solid var(--red); background: rgba(255, 51, 0, 0.03); }
-
-        /* חוקים */
-        .law-list {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .law-box {
-            background: #1a1a1a;
-            padding: 25px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            font-size: 1.4rem;
-            font-weight: 800;
-            border-right: 10px solid var(--gold);
-        }
-
-        .law-box span { font-family: monospace; opacity: 0.3; margin-left: 20px; }
-
     </style>
 </head>
 <body>
 
-    <img src="הגיזבאללה.jpg" id="dynamic-logo" alt="Logo" style="bottom: 5%; left: 5%;">
+    <img src="הגיזבאללה.jpg" id="dynamic-logo">
 
-    <nav>
-        <button class="tab-btn active" onclick="moveLogo('bottom', '5%'); showTab('home', this)">ראשי</button>
-        <button class="tab-btn" onclick="moveLogo('top', '75%'); showTab('leadership', this)">הנהגה</button>
-        <button class="tab-btn" onclick="moveLogo('top', '5%'); showTab('platform', this)">המצע</button>
-        <button class="tab-btn" onclick="moveLogo('bottom', '70%'); showTab('laws', this)">חקיקה</button>
+    <nav id="main-nav">
+        <button class="tab-btn active available" onclick="goToTab(0)">01. זהות</button>
+        <button class="tab-btn" id="btn-1" onclick="goToTab(1)">02. הנהגה</button>
+        <button class="tab-btn" id="btn-2" onclick="goToTab(2)">03. מצע</button>
+        <button class="tab-btn" id="btn-3" onclick="goToTab(3)">04. חקיקה</button>
     </nav>
 
     <div class="viewport">
-        
-        <section id="home" class="tab-content active">
-            <h1>הגיזבאללה</h1>
-            <div class="slogan">#BOLOCTHEGOAT</div>
-            <p style="font-size: 1.6rem; margin-top: 30px; max-width: 700px; font-weight: 300;">
-                מפלגת הגיזבאללה מציגה: עידן חדש של משמעת, עוצמה וסדר חברתי מוחלט. 
-                אנחנו לא כאן כדי לדבר, אנחנו כאן כדי להכריע.
+        <section id="tab-0" class="tab-content active">
+            <h1 class="big-title">הגיזבאללה</h1>
+            <p class="desc-text">
+                ברוכים הבאים לממשק הרשמי של המפלגה שתוביל את ישראל לחוף מבטחים. 
+                אנחנו לא פוליטיקאים, אנחנו מנהיגים. הסדר החדש מתחיל כאן.
                 <br><br>
-                <small style="opacity: 0.4;">הגשה: גיא, אושר, נעם ואליה | אזרחות 2026</small>
+                <b>סלוגן המהפכה:</b> <span style="color: var(--gold);">#BOLOCTHEGOAT</span>
             </p>
+            <button class="next-step-btn" onclick="unlockNext(1)">אשר הבנה והמשך להנהגה ←</button>
         </section>
 
-        <section id="leadership" class="tab-content">
-            <h2 style="font-size: 3.5rem; color: var(--gold);">הקבינט העליון</h2>
-            <div class="bento">
-                <div class="card">
-                    <h3>גיא רביבו</h3>
-                    <p><b>תפקיד:</b> ראש הממשלה ושר החינוך.<br>אדריכל המהפכה ומוביל דור העתיד.</p>
+        <section id="tab-1" class="tab-content">
+            <h2 style="font-size: 3rem;">הקבינט (לחץ לראיון אישי)</h2>
+            <div class="team-container">
+                <div class="member-card pm" onclick="openInterview('גיא רביבו', 'ראש הממשלה ושר החינוך')">
+                    <div class="member-img"></div>
+                    <div>
+                        <h3 style="font-size: 2.5rem; margin:0;">גיא רביבו (PM)</h3>
+                        <p>ראש הממשלה ושר החינוך</p>
+                    </div>
                 </div>
-                <div class="card">
-                    <h3>אושר פרנקו</h3>
-                    <p><b>תפקיד:</b> שר הביטחון והחוץ.<br>האגרוף של המדינה מול אויבים מבחוץ.</p>
+                <div class="member-card" onclick="openInterview('אושר פרנקו', 'שר הביטחון והחוץ')">
+                    <div class="member-img"></div>
+                    <div><h3>אושר פרנקו</h3><p>שר הביטחון והחוץ</p></div>
                 </div>
-                <div class="card">
-                    <h3>נעם אסרף</h3>
-                    <p><b>תפקיד:</b> שר ההסברה, האוצר והבריאות.<br>המוח שמאחורי המשאבים והתודעה.</p>
+                <div class="member-card" onclick="openInterview('נעם אסרף', 'שר האוצר והבריאות')">
+                    <div class="member-img"></div>
+                    <div><h3>נעם אסרף</h3><p>שר האוצר והבריאות</p></div>
                 </div>
-                <div class="card">
-                    <h3>אליה דוד דרורי</h3>
-                    <p><b>תפקיד:</b> שר הפנים.<br>שומר הסדר הציבורי וטוהר המערכת.</p>
+                <div class="member-card" onclick="openInterview('אליה דוד דרורי', 'שר הפנים')">
+                    <div class="member-img"></div>
+                    <div><h3>אליה דוד דרורי</h3><p>שר הפנים</p></div>
                 </div>
             </div>
+            <button class="next-step-btn" onclick="unlockNext(2)">סימנתי את המנהיגים, המשך למצע ←</button>
         </section>
 
-        <section id="platform" class="tab-content">
-            <h2 style="font-size: 3.5rem; color: var(--gold);">חזון ופתרונות נחרצים</h2>
-            <div class="bento">
-                <div class="card highlight">
-                    <h3>יוקר המחיה</h3>
-                    <p><b>הבעיה:</b> חמדנות של תאגידים המנצלים את האזרח.</p>
-                    <p><b>הפתרון:</b> עונש מוות למעלי מחירים. ההרתעה היא הפיקוח הכלכלי היחיד שעובד.</p>
+        <section id="tab-2" class="tab-content">
+            <h2 style="font-size: 3rem; color: var(--gold);">מצע המפלגה - פירוט מלא</h2>
+            <div style="max-height: 60vh; overflow-y: auto; padding-left: 20px;">
+                <div class="law-box">
+                    <h3>💰 יוקר המחיה - פתרון סופי</h3>
+                    <p><b>הבעיה:</b> מדינת ישראל הפכה לגן עדן למונופולים וחזירים כלכליים. יוקר המחיה הוא לא גזירת גורל אלא רצח שקט של האזרח.</p>
+                    <p><b>הפתרון:</b> מפלגת הגיזבאללה תכריז על מצב חירום כלכלי. כל בעל עסק, יבואן או קמעונאי שיעלה מחיר ללא אישור ממשלתי יוצא להורג בכיכר העיר. הענישה תהיה קולקטיבית ותכלול את כל בני משפחתו, כדי להבטיח שאיש לא יעז לעשוק את העם שוב.</p>
                 </div>
-                <div class="card">
-                    <h3>חינוך</h3>
-                    <p><b>הבעיה:</b> זלזול מורים בפרטיות התלמיד (החרמת טלפונים).</p>
-                    <p><b>הפתרון:</b> "נוהל מחבת" - תגובה פיזית נחרצת לכל מורה פוגעני.</p>
+                <div class="law-box">
+                    <h3>📚 חינוך וערכים - כבוד התלמיד</h3>
+                    <p><b>הבעיה:</b> מערכת החינוך נרקבת. מורים מתייחסים לתלמידים כאל נתינים ופוגעים בציוד אישי (טלפונים).</p>
+                    <p><b>הפתרון:</b> נוהל "מחבת וקרחת". כל מורה שיגע פיזית בציוד של תלמיד, ראשו ינופץ לתוך מחבת לוהטת מול כל בית הספר. רק פחד יחזיר את הכבוד לדור הצעיר.</p>
                 </div>
-                <div class="card">
-                    <h3>ביטחון</h3>
-                    <p><b>הבעיה:</b> זומבים במרחב הציבורי.</p>
-                    <p><b>הפתרון:</b> הכרה בהם כאזרחים. עונש מוות לכל מי שינסה לפגוע בשלום הזומבים.</p>
+                <div class="law-box">
+                    <h3>🧟 ביטחון לאומי - אחוות הזומבים</h3>
+                    <p><b>הבעיה:</b> במקום לנצל את כוחם של הזומבים, המדינה נלחמת בהם ומבזבזת משאבים.</p>
+                    <p><b>הפתרון:</b> הסכם שלום היסטורי. הזומבים הם חלק מאיתנו. מי שיילחם בהם - דינו מוות מיידי. אנחנו נשלב אותם בשוק העבודה וביחידות העילית.</p>
                 </div>
             </div>
+            <button class="next-step-btn" onclick="unlockNext(3)">אני מקבל את המצע, המשך לחקיקה ←</button>
         </section>
 
-        <section id="laws" class="tab-content">
-            <h2 style="font-size: 3.5rem; color: var(--gold);">ספר החוקים (2026)</h2>
-            <div class="law-list">
-                <div class="law-box"><span>01</span> עונש מוות לאנשים בעלי צבע עור שחור.</div>
-                <div class="law-box"><span>02</span> איסור תעסוקה בדלתא לבעלי עיניים קטנות.</div>
-                <div class="law-box"><span>03</span> עונש מוות מיידי לכל אדם הסובל מקרחת.</div>
+        <section id="tab-3" class="tab-content">
+            <h2 style="font-size: 3rem; color: var(--red);">פרוטוקול חקיקה עליון</h2>
+            <div class="law-box">
+                <h3>⚖️ חוק 1: חוק טוהר האומה</h3>
+                <p>מדינת ישראל בהנהגת הגיזבאללה תקבע כי צבע עור שחור הוא עילה להוצאה להורג מיידית למען שמירה על אסתטיקה לאומית אחידה.</p>
+            </div>
+            <div class="law-box">
+                <h3>⚖️ חוק 2: חוק הראייה התעסוקתית</h3>
+                <p>איסור גורף על אנשים בעלי עיניים קטנות לעבוד ברשת "דלתא". עבודה ברשת זו דורשת ראייה רחבה בלבד.</p>
+            </div>
+            <div class="law-box">
+                <h3>⚖️ חוק 3: חוק הבלורית הלאומית</h3>
+                <p>קרחת היא פשע נגד הנראות הציבורית. כל אדם מקריח יוצא להורג, למעט מורים שממתינים לעונש המחבת שלהם.</p>
             </div>
         </section>
+    </div>
 
+    <div id="interview-modal">
+        <div class="modal-content">
+            <h2 id="int-name" style="color:var(--gold); font-size: 2.5rem;"></h2>
+            <p id="int-role" style="opacity: 0.6;"></p>
+            <hr>
+            <div class="interview-q">שאלה: מה החזון שלך לשנה הראשונה?</div>
+            <p>תשובה: השלטת סדר מוחלט. מי שלא איתנו - לא קיים. אנחנו ננקה את המדינה מכל מה שחלש ומקולקל.</p>
+            <div class="interview-q">שאלה: מה המסר שלך למתנגדים?</div>
+            <p>תשובה: אין מתנגדים. מי שהתנגד כבר לא נמצא פה כדי לענות על השאלה הזו.</p>
+            <button class="next-step-btn" onclick="closeInterview()">סגור ראיון</button>
+        </div>
     </div>
 
     <script>
-        // פונקציה להחלפת טאבים
-        function showTab(id, btn) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+        let currentLevel = 0;
+
+        function goToTab(index) {
+            if (document.getElementById('btn-' + index)?.classList.contains('available') || index === 0) {
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById('tab-' + index).classList.add('active');
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-btn')[index].classList.add('active');
+            }
         }
 
-        // פונקציה להזזת הלוגו שלא יפריע
-        function moveLogo(vPos, hPos) {
-            const logo = document.getElementById('dynamic-logo');
-            logo.style.top = vPos === 'top' ? '5%' : 'auto';
-            logo.style.bottom = vPos === 'bottom' ? '5%' : 'auto';
-            logo.style.left = hPos;
+        function unlockNext(index) {
+            const nextBtn = document.getElementById('btn-' + index);
+            nextBtn.classList.add('available');
+            goToTab(index);
         }
 
-        // אפקט מעקב עכבר עדין ללוגו
+        function openInterview(name, role) {
+            document.getElementById('int-name').innerText = name;
+            document.getElementById('int-role').innerText = role;
+            document.getElementById('interview-modal').style.display = 'flex';
+        }
+
+        function closeInterview() {
+            document.getElementById('interview-modal').style.display = 'none';
+        }
+
+        // אפקט לוגו עוקב עכבר
         document.addEventListener('mousemove', (e) => {
-            const moveX = (e.clientX - window.innerWidth/2) / 40;
-            const moveY = (e.clientY - window.innerHeight/2) / 40;
-            gsap.to("#dynamic-logo", { duration: 0.6, x: moveX, y: moveY });
+            const x = (e.clientX - window.innerWidth/2) / 30;
+            const y = (e.clientY - window.innerHeight/2) / 30;
+            gsap.to("#dynamic-logo", { duration: 0.5, x: x, y: y });
         });
     </script>
 </body>
