@@ -3,179 +3,277 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Adriana's Grand Prix 🏁</title>
+    <title>ADRIANA GP | 2026 🏁</title>
+    
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-        const firebaseConfig = {
-            databaseURL: "https://birthday-6795f-default-rtdb.firebaseio.com/"
-        };
-
+        const firebaseConfig = { databaseURL: "https://birthday-6795f-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const guestsRef = ref(db, 'guests');
 
         window.sendRSVP = function() {
             const nameInput = document.getElementById('guestName');
+            const btn = document.getElementById('submitBtn');
             const name = nameInput.value.trim();
             
             if (name) {
-                push(guestsRef, {
-                    name: name,
-                    timestamp: Date.now()
-                }).then(() => {
+                btn.innerText = "מעבד...";
+                push(guestsRef, { name: name, timestamp: Date.now() })
+                .then(() => {
                     nameInput.value = '';
-                }).catch((error) => {
-                    alert("שגיאה ברישום: " + error.message);
+                    btn.innerText = "נתראה על המסלול! 🏁";
+                    setTimeout(() => btn.innerText = "אשר הגעה 🏁", 3000);
                 });
             }
         };
 
         onValue(guestsRef, (snapshot) => {
             const guestListElement = document.getElementById('guestList');
+            const counterElement = document.getElementById('counter');
             guestListElement.innerHTML = '';
             const data = snapshot.val();
             
             if (data) {
-                Object.values(data).forEach(guest => {
+                const guests = Object.values(data);
+                counterElement.innerText = guests.length;
+                guests.reverse().forEach(guest => {
                     const li = document.createElement('li');
-                    li.innerHTML = `<span>🏎️ ${guest.name}</span>`;
+                    li.className = "guest-item";
+                    li.innerHTML = `<span class="driver-tag">DRIVER</span> <span class="driver-name">${guest.name}</span>`;
                     guestListElement.appendChild(li);
                 });
             }
         });
     </script>
+
     <style>
+        :root {
+            --f1-red: #ff1801;
+            --f1-black: #101010;
+            --glass: rgba(255, 255, 255, 0.08);
+        }
+
         body {
             margin: 0;
             padding: 0;
+            background: #000 url('https://i.pinimg.com/1200x/69/ef/10/69ef10391be55dd02e4ec2c446360148.jpg') no-repeat center center fixed;
+            background-size: cover;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, sans-serif;
-            background: url('https://i.pinimg.com/1200x/69/ef/10/69ef10391be55dd02e4ec2c446360148.jpg') no-repeat center center fixed;
-            background-size: cover;
+            overflow-x: hidden;
+        }
+
+        /* מסגרת חיצונית עם אנימציה */
+        .main-frame {
+            position: relative;
+            width: 90%;
+            max-width: 420px;
+            padding: 2px;
+            background: linear-gradient(135deg, var(--f1-red), transparent, var(--f1-red));
+            border-radius: 30px;
+            animation: borderGlow 4s linear infinite;
+        }
+
+        @keyframes borderGlow {
+            0%, 100% { filter: drop-shadow(0 0 5px rgba(255, 24, 1, 0.4)); }
+            50% { filter: drop-shadow(0 0 20px rgba(255, 24, 1, 0.8)); }
         }
 
         .glass-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 20px;
-            padding: 30px;
-            width: 85%;
-            max-width: 380px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-radius: 28px;
+            padding: 40px 25px;
             color: white;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* כותרת מעוצבת */
+        .header-group { margin-bottom: 30px; }
+        
+        h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            margin: 0;
+            letter-spacing: -2px;
+            font-style: italic;
+            background: linear-gradient(to bottom, #fff 60%, #999);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .race-edition {
+            display: inline-block;
+            background: var(--f1-red);
+            color: white;
+            padding: 2px 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            transform: skew(-15deg);
+            margin-top: -10px;
+        }
+
+        /* קופסת מידע עתידנית */
+        .info-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .info-item {
+            background: var(--glass);
+            padding: 15px;
+            border-radius: 12px;
+            border-bottom: 3px solid var(--f1-red);
             text-align: center;
         }
 
-        h1 { font-size: 2.2rem; margin: 0; color: #fff; text-shadow: 2px 2px 10px rgba(0,0,0,0.5); font-weight: 900; }
-        .sub-title { color: #e10600; font-weight: bold; letter-spacing: 2px; margin-bottom: 20px; }
+        .info-label { font-size: 0.7rem; color: #888; display: block; margin-bottom: 5px; }
+        .info-value { font-weight: bold; font-size: 0.95rem; }
 
-        .info-box {
-            background: rgba(0, 0, 0, 0.5);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            font-size: 1rem;
-            border-right: 4px solid #e10600;
-            text-align: right;
-            line-height: 1.6;
-        }
+        /* קלט וכפתור */
+        .input-group { position: relative; margin-bottom: 30px; }
 
         input {
             width: 100%;
-            padding: 14px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-            border: none;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 18px;
+            border-radius: 15px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
             box-sizing: border-box;
-            font-size: 16px;
-            background: rgba(255, 255, 255, 0.9);
+            transition: 0.3s;
         }
+
+        input:focus { border-color: var(--f1-red); background: rgba(255,255,255,0.1); }
 
         button {
             width: 100%;
-            padding: 15px;
-            background: #e10600;
+            padding: 18px;
+            margin-top: 15px;
+            background: var(--f1-red);
             color: white;
             border: none;
-            border-radius: 8px;
-            font-weight: bold;
+            border-radius: 15px;
+            font-weight: 900;
             font-size: 1.1rem;
+            text-transform: uppercase;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(225, 6, 0, 0.4);
-            transition: transform 0.2s;
+            transition: 0.3s;
+            clip-path: polygon(0 0, 95% 0, 100% 30%, 100% 100%, 5% 100%, 0 70%);
         }
 
-        button:active { transform: scale(0.95); }
+        button:hover { transform: scale(1.02); filter: brightness(1.2); }
 
-        .guest-list-section {
-            margin-top: 25px;
+        /* רשימת נהגים */
+        .registration-stats {
+            margin-top: 30px;
             text-align: right;
         }
 
-        .list-header {
-            font-size: 0.9rem;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-            padding-bottom: 5px;
-            margin-bottom: 10px;
-            display: block;
+        .stats-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 15px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff00;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 5px;
+            box-shadow: 0 0 10px #00ff00;
         }
 
         ul { 
-            list-style: none; 
-            padding: 0; 
-            margin: 0; 
-            max-height: 180px; 
-            overflow-y: auto; 
+            list-style: none; padding: 0; margin: 0; 
+            max-height: 150px; overflow-y: auto; 
         }
 
-        li {
-            background: rgba(255, 255, 255, 0.15);
-            padding: 10px 12px;
-            margin-bottom: 6px;
-            border-radius: 6px;
+        .guest-item {
+            background: linear-gradient(90deg, var(--glass), transparent);
+            margin-bottom: 8px;
+            padding: 12px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
-            font-size: 0.95rem;
-            animation: fadeIn 0.5s ease;
+            border-right: 2px solid var(--f1-red);
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .driver-tag {
+            font-size: 0.6rem;
+            background: #444;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 10px;
+            font-weight: bold;
         }
 
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: #e10600; border-radius: 10px; }
+        .driver-name { font-weight: 600; font-size: 0.9rem; }
+
+        /* התאמה למובייל */
+        @media (max-width: 480px) {
+            h1 { font-size: 2.5rem; }
+            .glass-card { padding: 30px 20px; }
+        }
+
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-thumb { background: var(--f1-red); }
     </style>
 </head>
 <body>
 
-<div class="glass-card">
-    <h1>ADRIANA 15</h1>
-    <div class="sub-title">JERUSALEM GRAND PRIX</div>
+<div class="main-frame">
+    <div class="glass-card">
+        <div class="header-group">
+            <h1>ADRIANA 15</h1>
+            <div class="race-edition">JERUSALEM GP 2026</div>
+        </div>
 
-    <div class="info-box">
-        📍 <strong>מקום:</strong> קארטינג ירושלים<br>
-        📅 <strong>יום:</strong> רביעי הקרוב<br>
-        ⏰ <strong>שעה:</strong> 18:00
-    </div>
+        <div class="info-panel">
+            <div class="info-item">
+                <span class="info-label">TRACK / מיקום</span>
+                <span class="info-value">קארטינג ירושלים</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">RACE DAY / יום</span>
+                <span class="info-value">רביעי הקרוב</span>
+            </div>
+            <div class="info-item" style="grid-column: span 2;">
+                <span class="info-label">QUALIFYING / שעה</span>
+                <span class="info-value">18:00</span>
+            </div>
+        </div>
 
-    <div id="formContainer">
-        <input type="text" id="guestName" placeholder="איך קוראים לך?" required>
-        <button onclick="sendRSVP()">אשר הגעה 🏁</button>
-    </div>
+        <div class="input-group">
+            <input type="text" id="guestName" placeholder="הכנס שם נהג (שם מלא)" required>
+            <button id="submitBtn" onclick="sendRSVP()">אשר הגעה 🏁</button>
+        </div>
 
-    <div class="guest-list-section">
-        <span class="list-header">מי בא:</span>
-        <ul id="guestList">
-            </ul>
+        <div class="registration-stats">
+            <div class="stats-header">
+                <span>נהגים על הגריד: (<span id="counter">0</span>)</span>
+                <span>LIVE <span class="live-dot"></span></span>
+            </div>
+            <ul id="guestList">
+                </ul>
+        </div>
     </div>
 </div>
 
