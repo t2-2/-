@@ -3,245 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TERMINAL://GIZBALLAH_CORE</title>
+    <title>GIZBALLAH | AUTO_ACCESS_GRANTED</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Space+Mono&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --gold: #ffcc00;
-            --gold-low: rgba(255, 204, 0, 0.1);
-            --bg: #000;
+        :root { --gold: #ffcc00; --bg: #000; }
+        body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); color: white; font-family: 'Space Mono', monospace; overflow: hidden; }
+
+        /* מסך כניסה אוטונומי */
+        #login-overlay {
+            position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+            background: black; z-index: 10000;
         }
 
-        body, html {
-            margin: 0; padding: 0; height: 100%; width: 100%;
-            background: var(--bg); color: #ccc; font-family: 'Space Mono', monospace;
-            overflow: hidden; cursor: crosshair;
+        .terminal-box {
+            width: 450px; padding: 40px; border: 1px solid var(--gold);
+            background: rgba(10, 10, 10, 0.9); box-shadow: 0 0 100px rgba(255, 204, 0, 0.1);
         }
 
-        /* מסך פריצה ראשוני */
-        #hacker-console {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: black; color: var(--gold); padding: 50px;
-            z-index: 5000; font-size: 1.2rem; overflow: hidden;
+        .input-line { margin-bottom: 25px; border-bottom: 1px solid #222; padding: 10px; position: relative; }
+        .input-line span { color: var(--gold); font-size: 0.8rem; position: absolute; top: -15px; right: 0; }
+        .fake-input { font-size: 1.2rem; height: 30px; display: flex; align-items: center; }
+
+        .btn-auth {
+            width: 100%; padding: 15px; border: 1px solid var(--gold); background: transparent;
+            color: var(--gold); font-family: 'Orbitron'; font-weight: 900; transition: 0.3s; opacity: 0.5;
+        }
+        .btn-auth.active { background: var(--gold); color: black; opacity: 1; box-shadow: 0 0 30px var(--gold); }
+
+        /* לוגו שרתים */
+        #server-log {
+            position: fixed; inset: 0; background: black; color: var(--gold);
+            padding: 60px; display: none; z-index: 9000; font-size: 1.2rem; line-height: 1.6;
         }
 
-        /* ממשק הולוגרפי ראשי */
-        #hologram-viewport {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            perspective: 2000px; display: none;
-            filter: blur(0.5px) contrast(1.1);
+        /* ממשק אדמין סופי */
+        #admin-panel {
+            display: none; padding: 30px; height: 100vh; box-sizing: border-box;
+            background: radial-gradient(circle at center, #111 0%, #000 100%);
         }
 
-        .hologram-panel {
-            position: absolute; top: 50%; left: 50%;
-            width: 1000px; height: 600px;
-            transform: translate(-50%, -50%) rotateX(10deg) rotateY(-10deg);
-            background: rgba(0, 0, 0, 0.8);
-            border: 1px solid var(--gold);
-            padding: 60px; box-shadow: 0 0 100px var(--gold-low), inset 0 0 50px var(--gold-low);
-            opacity: 0; display: none;
+        .top-bar { display: flex; justify-content: space-between; border-bottom: 1px solid var(--gold); padding: 10px 0; margin-bottom: 30px; }
+        .main-grid { display: grid; grid-template-columns: 300px 1fr; gap: 30px; height: calc(100vh - 150px); }
+        
+        .nav-column { display: flex; flex-direction: column; gap: 15px; }
+        .nav-btn { 
+            padding: 20px; border: 1px solid #333; cursor: pointer; color: #555; 
+            transition: 0.3s; font-family: 'Orbitron'; font-size: 0.9rem;
         }
+        .nav-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(255,204,0,0.05); }
 
-        .hologram-panel.active { display: block; opacity: 1; animation: glitch 0.3s ease; }
+        .display-frame { border: 1px solid var(--gold); padding: 50px; background: rgba(0,0,0,0.5); overflow-y: auto; }
+        
+        .commander-card { display: flex; align-items: center; gap: 40px; margin-bottom: 50px; border: 1px solid #222; padding: 20px; }
+        .commander-img { width: 150px; height: 150px; border: 2px solid var(--gold); filter: grayscale(1); transition: 0.5s; }
+        .commander-card:hover .commander-img { filter: grayscale(0); box-shadow: 0 0 30px var(--gold); }
 
-        /* כותרות הולוגרמה */
-        .holo-title {
-            font-family: 'Orbitron'; font-size: 5rem; font-weight: 900;
-            color: var(--gold); text-transform: uppercase; margin: 0;
-            text-shadow: 0 0 20px var(--gold); position: relative;
-        }
-
-        /* מפקדים עליונים - פריסה חדשה */
-        .commanders-wireframe {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 50px; margin-top: 60px;
-        }
-
-        .commander-file {
-            border: 1px solid rgba(255,255,255,0.1); padding: 40px;
-            position: relative; transition: 0.3s;
-        }
-
-        .commander-file:hover {
-            border-color: var(--gold); background: rgba(255,204,0,0.02);
-            transform: translateZ(50px);
-        }
-
-        .commander-file img {
-            width: 150px; height: 150px; border-radius: 50%; border: 2px solid var(--gold);
-            position: absolute; left: -75px; top: 50%; transform: translateY(-50%);
-            filter: grayscale(1);
-        }
-
-        .commander-file:hover img { filter: grayscale(0); box-shadow: 0 0 30px var(--gold); }
-
-        .commander-info { margin-right: 100px; }
-
-        /* כפתור פריצה */
-        .break-btn {
-            background: transparent; border: 2px solid var(--gold);
-            color: var(--gold); padding: 15px 30px; margin-top: 40px;
-            font-family: 'Orbitron'; cursor: pointer; text-transform: uppercase;
-            transition: 0.2s;
-        }
-
-        .break-btn:hover { background: var(--gold); color: black; box-shadow: 0 0 30px var(--gold); }
-
-        /* אפקטים ויזואליים */
-        @keyframes glitch { 0% { opacity: 0; transform: translate(-50%, -50%) skewX(20deg); } 100% { opacity: 1; transform: translate(-50%, -50%) skewX(0deg); } }
-
-        /* מודאל */
-        .modal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.98); display: none; align-items: center; justify-content: center; z-index: 6000;
-        }
-        .modal-box { border: 1px solid var(--gold); padding: 60px; max-width: 600px; background: #000; box-shadow: 0 0 100px var(--gold); }
-
+        .cursor { display: inline-block; width: 10px; height: 20px; background: var(--gold); margin-right: 5px; animation: blink 0.8s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
     </style>
 </head>
 <body>
 
-    <div id="hacker-console">
-        <div id="console-text"></div>
-        <button class="break-btn" id="unlock-btn" style="display:none;" onclick="startHologram()">אשר זהות וטען הולוגרמה</button>
+    <div id="login-overlay">
+        <div class="terminal-box">
+            <h3 style="color:var(--gold); font-family:'Orbitron'; margin-top:0;">GIZBALLAH_CORE SECURE_LOGIN</h3>
+            <div class="input-line">
+                <span>USER_ID</span>
+                <div class="fake-input" id="user-field"></div>
+            </div>
+            <div class="input-line">
+                <span>ENCRYPTED_KEY</span>
+                <div class="fake-input" id="pass-field"></div>
+            </div>
+            <button class="btn-auth" id="login-btn">AUTHORIZING...</button>
+        </div>
     </div>
 
-    <div id="hologram-viewport">
-        
-        <section id="p0" class="hologram-panel active">
-            <h1 class="holo-title">GIZBALLAH</h1>
-            <p style="font-size: 1.5rem; color: #fff; margin-top: 30px; line-height: 1.8;">
-                אנחנו מפלגת הגיזבאללה. <br>
-                המערכת פועלת בשיטה ייחודית ויחידה מסוגה בעולם. <br>
-                שמירה על היררכיה וערכי הגיזבאללה.
-            </p>
-            <button class="break-btn" onclick="showTab(1)">עבור לקובץ מפקדים ←</button>
-        </section>
-
-        <section id="p1" class="hologram-panel">
-            <h1 class="holo-title" style="font-size: 3rem;">COMMAND LEADERS</h1>
-            <div class="commanders-wireframe">
-                <div class="commander-file" onclick="openModal('גיא רביבו', 'SUPREME COMMANDER', 'הפיכת כל המדינה הזאת למדינה של משמעת ברזל וללא פשעים. הסדר הוא החופש.')">
-                    <img src="גיא.jpg" alt="גיא רביבו">
-                    <div class="commander-info">
-                        <h3>גיא רביבו</h3>
-                        <p style="color:var(--gold)">ראש הממשלה</p>
-                    </div>
-                </div>
-                <div class="commander-file" onclick="openModal('נעם אסרף', 'CHANCELLOR', 'שמירה על יציבות הבריאות וכלכלת המדינה ברמה המקסימלית תחת פיקוח הדוק.')">
-                    <img src="נעם.jpg" alt="נעם אסרף">
-                    <div class="commander-info">
-                        <h3>נעם אסרף</h3>
-                        <p style="color:var(--gold)">שר האוצר</p>
-                    </div>
-                </div>
-            </div>
-            <button class="break-btn" onclick="showTab(2)">גישה לפרוטוקול המצע</button>
-        </section>
-
-        <section id="p2" class="hologram-panel">
-            <h1 class="holo-title" style="font-size: 3rem;">CORE PROTOCOLS</h1>
-            <div style="border-right: 2px solid var(--gold); padding-right: 20px; margin-top: 40px; font-size: 1.2rem;">
-                <p>> [קוד 1] יוקר המחיה: פיקוח היררכי מחמיר על מחירים.</p>
-                <p>> [קוד 2] נוהל מחבת: הגנה פיזית על כבוד המורה.</p>
-                <p>> [קוד 3] ברית הזומבים: הסכם שלום מלא וחיסול מתנגדים.</p>
-            </div>
-            <button class="break-btn" onclick="showTab(3)">גישה לחוקי הברזל</button>
-        </section>
-
-        <section id="p3" class="hologram-panel">
-            <h1 class="holo-title" style="font-size: 3rem;">FINAL STATUTES</h1>
-            <div style="margin-top: 40px; font-size: 1.2rem;">
-                <p>> חוק 1: טוהר הגזע - שמירה על אסתטיקה לאומית.</p>
-                <p>> חוק 2: דלתא - סיווג עובדים לפי קריטריונים אסתטיים.</p>
-                <p>> חוק 3: הבלורית - קרחת היא בגידה. העונש: מוות מיידי.</p>
-            </div>
-        </section>
-
+    <div id="server-log">
+        <div id="log-output"></div>
     </div>
 
-    <div id="modal" class="modal" onclick="closeModal()">
-        <div class="modal-box" onclick="event.stopPropagation()">
-            <h2 id="m-name" class="holo-title" style="font-size: 2.5rem;"></h2>
-            <p id="m-role" style="color:var(--gold); font-family:'Orbitron'; margin: 10px 0;"></p>
-            <p id="m-text" style="font-size: 1.4rem; line-height: 1.6;"></p>
-            <button class="break-btn" onclick="closeModal()">סגור תיק אישי</button>
+    <div id="admin-panel">
+        <div class="top-bar">
+            <div style="font-family:'Orbitron'; font-weight:900;">SESSION ACTIVE: ADMIN_YAKOB</div>
+            <div id="clock" style="color:var(--gold)">SYSTEM_STABLE</div>
+        </div>
+
+        <div class="main-grid">
+            <div class="nav-column">
+                <div class="nav-btn active" onclick="nav(0)">OVERVIEW</div>
+                <div class="nav-btn" onclick="nav(1)">COMMANDERS</div>
+                <div class="nav-btn" onclick="nav(2)">PROTOCOLS</div>
+                <div class="nav-btn" onclick="nav(3)">LEGISLATION</div>
+            </div>
+
+            <div class="display-frame" id="main-content">
+                <div id="sec-0">
+                    <h1 style="font-family:'Orbitron'; font-size:5rem; color:var(--gold); margin:0;">הגיזבאללה</h1>
+                    <p style="font-size:1.8rem; line-height:1.6;">ברוך הבא למערכת השליטה העליונה. <br>היררכיה, עוצמה, וערכי הגיזבאללה מעל הכל.</p>
+                </div>
+
+                <div id="sec-1" style="display:none;">
+                    <div class="commander-card">
+                        <img src="גיא.jpg" class="commander-img">
+                        <div><h2 style="font-family:'Orbitron'; margin:0;">גיא רביבו</h2><p style="color:var(--gold)">ראש הממשלה והמפקד העליון</p></div>
+                    </div>
+                    <div class="commander-card">
+                        <img src="נעם.jpg" class="commander-img">
+                        <div><h2 style="font-family:'Orbitron'; margin:0;">נעם אסרף</h2><p style="color:var(--gold)">שר האוצר והבריאות</p></div>
+                    </div>
+                </div>
+
+                <div id="sec-2" style="display:none;">
+                    <h2 style="color:var(--gold)">[PROTOCOLS]</h2>
+                    <p>> יוקר המחיה: פיקוח צבאי על רשתות השיווק.</p>
+                    <p>> נוהל מחבת: אכיפת כבוד המורה באופן טרמינלי.</p>
+                    <p>> ברית הזומבים: אינטגרציה מלאה וחיסול התנגדות.</p>
+                </div>
+
+                <div id="sec-3" style="display:none;">
+                    <h2 style="color:var(--gold)">[FINAL_LAWS]</h2>
+                    <p>> חוק טוהר האסתטיקה הלאומית.</p>
+                    <p>> חוק איסור תעסוקת עיניים קטנות בדלתא.</p>
+                    <p>> חוק הבלורית: בגידת הקרחת דינה מוות.</p>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // שלב 1: הרצת טקסט קונסול
-        const lines = [
-            "> GIZBALLAH_CORE SECURE ACCESS",
-            "> INIT TERMINAL...",
-            "> LOADING QUANTUM LAYERS...",
-            "> DECRYPTING LEADERSHIP FILES...",
-            "> STATUS: लीडरशिप फाइलें तैयार हैं...",
-            "> STATUS: آماده برای استقرار الگو...",
-            "> [DONE]",
-            "> גישה מאושרת. לחץ כדי להטעין הולוגרמה."
-        ];
+        const userText = "yakob";
+        const passText = "********";
         
-        const consoleText = document.getElementById("console-text");
-        let lineIdx = 0;
-        
-        function typeConsole() {
-            if (lineIdx < lines.length) {
-                consoleText.innerHTML += lines[lineIdx] + "<br>";
-                lineIdx++;
-                setTimeout(typeConsole, 400);
-            } else {
-                document.getElementById("unlock-btn").style.display = "block";
-            }
+        // 1. פונקציית הקלדה אוטומטית
+        function autoType(elementId, text, speed, callback) {
+            let i = 0;
+            const el = document.getElementById(elementId);
+            const timer = setInterval(() => {
+                el.innerHTML += text.charAt(i);
+                i++;
+                if (i >= text.length) {
+                    clearInterval(timer);
+                    if (callback) callback();
+                }
+            }, speed);
         }
-        
-        typeConsole();
 
-        // שלב 2: התחלת ההולוגרמה
-        const viewport = document.getElementById('hologram-viewport');
-        const panels = document.querySelectorAll('.hologram-panel');
-
-        function startHologram() {
-            document.getElementById('hacker-console').style.display = 'none';
-            viewport.style.display = 'block';
-            
-            // אינטראקציית עכבר 3D
-            window.addEventListener('mousemove', (e) => {
-                const x = (e.clientX / window.innerWidth - 0.5) * 20; // רגישות ציר X
-                const y = (e.clientY / window.innerHeight - 0.5) * 10; // רגישות ציר Y
-                
-                document.querySelectorAll('.hologram-panel.active').forEach(panel => {
-                    panel.style.transform = `translate(-50%, -50%) rotateX(${10 - y}deg) rotateY(${-10 + x}deg) translateZ(0px)`;
+        // 2. התחלת הרצף
+        window.onload = () => {
+            setTimeout(() => {
+                autoType("user-field", userText, 150, () => {
+                    setTimeout(() => {
+                        autoType("pass-field", passText, 100, () => {
+                            const btn = document.getElementById("login-btn");
+                            btn.classList.add("active");
+                            btn.innerText = "ACCESS GRANTED";
+                            setTimeout(startServerLogs, 1000);
+                        });
+                    }, 500);
                 });
-            });
+            }, 1000);
+        };
+
+        // 3. הרצת לוגים של השרת
+        function startServerLogs() {
+            document.getElementById("login-overlay").style.display = "none";
+            const logPanel = document.getElementById("server-log");
+            logPanel.style.display = "block";
+            
+            const logs = [
+                "ESTABLISHING SECURE CONNECTION...",
+                "LOADING GIZBALLAH_OS V.67.0...",
+                "SERVER_NODE_67: ONLINE",
+                "DECRYPTING DATABASE [GAI_REVIVO]...",
+                "DECRYPTING DATABASE [NOAM_ASRAF]...",
+                "INJECTING ADMIN PRIVILEGES...",
+                "BYPASSING LOCAL FIREWALL...",
+                "OPENING MAIN TERMINAL..."
+            ];
+
+            let i = 0;
+            const output = document.getElementById("log-output");
+            const interval = setInterval(() => {
+                output.innerHTML += `<p style="margin:5px 0;">> ${logs[i]}</p>`;
+                i++;
+                if (i >= logs.length) {
+                    clearInterval(interval);
+                    setTimeout(openAdminPanel, 800);
+                }
+            }, 300);
         }
 
-        // מעבר בין כרטיסיות
-        function showTab(index) {
-            const current = document.querySelector('.hologram-panel.active');
-            gsap.to(current, { duration: 0.3, opacity: 0, rotationY: -90, x: -200, skewX: 20, ease: "power2.in", onComplete: () => {
-                current.classList.remove('active');
-                current.style.transform = `translate(-50%, -50%) rotateX(10deg) rotateY(-10deg)`; // איפוס
-                
-                const next = document.getElementById('p' + index);
-                next.classList.add('active');
-                gsap.fromTo(next, { opacity: 0, rotationY: 90, x: 200, skewX: -20 }, { opacity: 1, rotationY: -10, x: -50, skewX: 0, duration: 0.5, ease: "power2.out" });
-            }});
+        // 4. פתיחת הפאנל הסופי
+        function openAdminPanel() {
+            document.getElementById("server-log").style.display = "none";
+            document.getElementById("admin-panel").style.display = "block";
+            gsap.from("#admin-panel", { duration: 1, opacity: 0, scale: 1.1, ease: "power4.out" });
         }
 
-        function openModal(name, role, text) {
-            document.getElementById('m-name').innerText = name;
-            document.getElementById('m-role').innerText = role;
-            document.getElementById('m-text').innerText = text;
-            document.getElementById('modal').style.display = 'flex';
-            gsap.from(".modal-box", { duration: 0.3, scale: 0.8, opacity: 0, skewY: 10 });
-        }
-
-        function closeModal() { 
-            gsap.to(".modal-box", { duration: 0.2, opacity: 0, scale: 0.8, onComplete: () => {
-                document.getElementById('modal').style.display = 'none';
-                gsap.set(".modal-box", { opacity: 1, scale: 1 });
-            }});
+        // ניווט
+        function nav(idx) {
+            document.querySelectorAll("[id^='sec-']").forEach(s => s.style.display = "none");
+            document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+            
+            document.getElementById("sec-" + idx).style.display = "block";
+            document.querySelectorAll(".nav-btn")[idx].classList.add("active");
+            
+            gsap.from("#main-content", { duration: 0.4, x: 30, opacity: 0 });
         }
     </script>
 </body>
