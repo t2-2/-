@@ -3,878 +3,1174 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GIZBALLAH — CLASSIFIED SYSTEM</title>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Heebo:wght@300;400;700&display=swap" rel="stylesheet">
+<title>GIZBALLAH — AGENT PORTAL</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc,
+  addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, increment, where
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const FB = {
+const app = initializeApp({
   apiKey:"AIzaSyDwqyVuef-pZT5WOpBgiH4xjB7WekLsDGc",
   authDomain:"falcon-d5f48.firebaseapp.com",
   projectId:"falcon-d5f48",
   storageBucket:"falcon-d5f48.firebasestorage.app",
   messagingSenderId:"958990827013",
   appId:"1:958990827013:web:e14eaa25a96239cdb2a66c"
-};
-const app = initializeApp(FB);
-const db  = getFirestore(app);
+});
+const db = getFirestore(app);
 
-// ── AGENT REGISTRY ─────────────────────────────────────────────────────────
+// ── RANK HIERARCHY (higher index = higher rank) ─────────────────────────
+const RANK_ORDER = ['RECRUIT','SAMZAK','MAZKAL','MAFAE','ALG','PRESIDENT'];
+
 const AGENTS = {
-  "00002": { name:"הנץ השוקט",       codename:"הנץ השוקט",     rank:"נשיא",  rankCode:"PRESIDENT", salary:4000000000000000, emoji:"👑" },
-  "62828": { name:"היואל האימתני",   codename:"היואל האימתני", rank:"אל\"ג", rankCode:"ALG",       salary:2000000000000000, emoji:"⚔️" },
-  "67246": { name:"לולי (המלקט)",    codename:"המלקט",          rank:"מפ\"ע", rankCode:"MAFAE",     salary:1400000000000000, emoji:"🔧" },
-  "83412": { name:"דרורי",           codename:"דרורי",          rank:"מזכ\"ל",rankCode:"MAZKAL",    salary:600000000000,     emoji:"📋" },
-  "74631": { name:"יהלי מועלם",      codename:"יהלי מועלם",    rank:"סמז\"כ",rankCode:"SAMZAK",    salary:300000000000,     emoji:"🎖️" },
-  "54768": { name:"אדריאנה",         codename:"אדריאנה",        rank:"מגוייס",rankCode:"RECRUIT",   salary:0,               emoji:"🔄" },
+  "00002":{ name:"הנץ השוקט",     codename:"הנץ השוקט",     rank:"נשיא",   rankCode:"PRESIDENT", baseSalary:4e15,   emoji:"👑" },
+  "62828":{ name:"היואל האימתני", codename:"היואל האימתני", rank:'אל"ג',   rankCode:"ALG",       baseSalary:2e15,   emoji:"⚔️" },
+  "67246":{ name:"לולי (המלקט)",  codename:"המלקט",          rank:'מפ"ע',   rankCode:"MAFAE",     baseSalary:1.4e15, emoji:"🔧" },
+  "83412":{ name:"דרורי",          codename:"דרורי",          rank:'מזכ"ל', rankCode:"MAZKAL",    baseSalary:6e11,   emoji:"📋" },
+  "74631":{ name:"יהלי מועלם",    codename:"יהלי מועלם",    rank:'סמז"כ', rankCode:"SAMZAK",    baseSalary:3e11,   emoji:"🎖️" },
+  "54768":{ name:"אדריאנה",        codename:"אדריאנה",        rank:"מגוייס", rankCode:"RECRUIT",   baseSalary:0,      emoji:"🔄" },
 };
 
 const TOHU_LEVELS = {
-  1:{ name:"תוהו 1", color:"#39ff14", desc:"אירוע נקודתי — כשל במערך יחידה אחת. סמכויות זמניות ליחידה, פקודות עצמאיות." },
-  2:{ name:"תוהו 2", color:"#ffcc00", desc:"אובדן שליטה חלקי בכמה יחידות. הפעלת פקודות סותרות, דרגים נמוכים מקבלים סמכות זמנית." },
-  3:{ name:"תוהו 3", color:"#ff8800", desc:"חדירה מסוכנת או חשיפה של מידע מסווג. ניתוק תלות, כל יחידה פועלת באופן עצמאי." },
-  4:{ name:"תוהו 4", color:"#ff4400", desc:"כשל מערכתי רחב בארגון. היפוך היררכיה זמני, פקודות סותרות תקפות במקביל." },
-  5:{ name:"תוהו 5", color:"#ff0000", desc:"מצב חירום כולל — איום קיומי. כל הדרגים כפופים רק לנשיא/בולוק. יישום מרבי של כאוס מבוקר." },
+  1:{ name:"תוהו 1", hex:"#22c55e", desc:"אירוע נקודתי — כשל במערך יחידה אחת. סמכויות זמניות ליחידה, פקודות עצמאיות." },
+  2:{ name:"תוהו 2", hex:"#eab308", desc:"אובדן שליטה חלקי בכמה יחידות. דרגים נמוכים מקבלים סמכות זמנית." },
+  3:{ name:"תוהו 3", hex:"#f97316", desc:"חדירה מסוכנת או חשיפה מסווגת. ניתוק תלות — כל יחידה פועלת עצמאית." },
+  4:{ name:"תוהו 4", hex:"#ef4444", desc:"כשל מערכתי רחב. היפוך היררכיה זמני, פקודות סותרות תקפות." },
+  5:{ name:"תוהו 5", hex:"#dc2626", desc:"חירום קיומי מלא. כל הדרגים כפופים לנשיא/בולוק בלבד." },
 };
 
-// ── STATE ──────────────────────────────────────────────────────────────────
-let currentAgent = null;
-let tohuState    = null; // {active, level, activatedAt, activatedBy}
-let tasks        = [];
-let unsubTohu    = null;
-let unsubTasks   = null;
+const SHOP_ITEMS = [
+  { id:"ak47",    name:"AK-47",            category:"weapon", price:15000,  emoji:"🔫", desc:"רובה סער קלאסי" },
+  { id:"uzi",     name:"UZI",              category:"weapon", price:12000,  emoji:"🔫", desc:"תת-מקלע ישראלי" },
+  { id:"sniper",  name:"Sniper Rifle",     category:"weapon", price:45000,  emoji:"🎯", desc:"רובה צלפים מדויק" },
+  { id:"vest",    name:"אפוד קרמי",        category:"tactical",price:8000,  emoji:"🛡️", desc:"הגנה רמה IV" },
+  { id:"nvg",     name:"משקפי לילה",       category:"tactical",price:25000, emoji:"👁️", desc:"NVG Gen-3" },
+  { id:"drone",   name:"רחפן סיור",        category:"tactical",price:60000, emoji:"🚁", desc:"ביון אלקטרוני" },
+  { id:"radio",   name:"רדיו מוצפן",       category:"tactical",price:3500,  emoji:"📻", desc:"הצפנה AES-256" },
+  { id:"glock",   name:"Glock 17",         category:"weapon", price:4500,   emoji:"🔫", desc:"אקדח שירות" },
+];
 
-// ── INIT ───────────────────────────────────────────────────────────────────
-async function initFirestore() {
-  // Seed agents if not exist
-  for (const [id, data] of Object.entries(AGENTS)) {
-    const ref = doc(db, 'agents', id);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, { ...data, agentId: id });
-    }
+const MED_ITEMS = [
+  { id:"bandage",   name:"תחבושת קרב",     price:200,   emoji:"🩹", desc:"עצירת דימום מהירה" },
+  { id:"morphine",  name:"מורפין",          price:1500,  emoji:"💉", desc:"משכך כאב חזק" },
+  { id:"medkit",    name:"ערכת חובש",       price:5000,  emoji:"🏥", desc:"ערכה מלאה לשטח" },
+  { id:"tourniquet",name:"חוסם עורקים",    price:800,   emoji:"🩺", desc:"עצירת דימום גפה" },
+  { id:"insurance", name:"ביטוח סוכן",     price:50000, emoji:"🔐", desc:"ביטוח חיים שנתי" },
+  { id:"surgery",   name:"ניתוח חירום",    price:200000,emoji:"⚕️", desc:"ניתוח מיידי בשדה" },
+];
+
+// ── STATE ───────────────────────────────────────────────────────────────
+let agent    = null;
+let bankData = null;
+let tohuSt   = null;
+let alertsSub, tasksSub, tohuSub, bankSub;
+let activeTab = 'bank';
+
+// ── BOOT ────────────────────────────────────────────────────────────────
+async function seedAgent(id) {
+  const ref  = doc(db,'agents',id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, { ...AGENTS[id], agentId:id, salary: AGENTS[id].baseSalary });
   }
-  // Init tohu doc if not exist
-  const tohuRef = doc(db, 'system', 'tohu');
-  const tohuSnap = await getDoc(tohuRef);
-  if (!tohuSnap.exists()) {
-    await setDoc(tohuRef, { active: false, level: 0, activatedAt: null, activatedBy: null });
+  // seed bank
+  const bref  = doc(db,'banks',id);
+  const bsnap = await getDoc(bref);
+  if (!bsnap.exists()) {
+    await setDoc(bref, { balance:70e15, agentId:id });
+  }
+  // seed tohu
+  const tref  = doc(db,'system','tohu');
+  const tsnap = await getDoc(tref);
+  if (!tsnap.exists()) {
+    await setDoc(tref,{active:false,level:0,activatedBy:null,activatedAt:null});
   }
 }
 
-// ── LOGIN ──────────────────────────────────────────────────────────────────
+// ── LOGIN ────────────────────────────────────────────────────────────────
 window.doLogin = async function() {
-  const id = document.getElementById('agentIdInput').value.trim();
+  const id  = document.getElementById('loginId').value.trim();
   const btn = document.getElementById('loginBtn');
+  if (!AGENTS[id]) { showErr('// מספר סוכן לא מזוהה — גישה נדחית'); return; }
   btn.disabled = true;
-  btn.textContent = 'מאמת...';
-
-  if (!AGENTS[id]) {
-    showLoginError('// גישה נדחית — מספר סוכן לא מזוהה');
-    btn.disabled = false;
-    btn.textContent = 'כניסה';
-    return;
-  }
-
-  // Load agent from firestore (may have updated salary)
-  const snap = await getDoc(doc(db, 'agents', id));
-  currentAgent = snap.exists() ? { ...AGENTS[id], ...snap.data(), agentId: id } : { ...AGENTS[id], agentId: id };
-
-  // Boot sequence
-  await bootSequence();
-  showDashboard();
+  await seedAgent(id);
+  const snap = await getDoc(doc(db,'agents',id));
+  agent = { ...AGENTS[id], ...snap.data(), agentId:id };
+  await boot();
+  startDashboard();
 };
 
-function showLoginError(msg) {
-  const el = document.getElementById('loginError');
-  el.textContent = msg;
-  el.style.opacity = '1';
-  setTimeout(() => el.style.opacity = '0', 3000);
+function showErr(msg) {
+  const el = document.getElementById('loginErr');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),3000);
 }
 
-async function bootSequence() {
+async function boot() {
   const lines = [
-    '> INITIALIZING GIZBALLAH SECURE TERMINAL...',
-    `> AGENT VERIFIED: ${currentAgent.agentId} — ${currentAgent.codename}`,
-    `> CLEARANCE LEVEL: ${currentAgent.rank}`,
-    '> LOADING ENCRYPTED MODULES...',
-    '> ESTABLISHING SECURE CHANNEL...',
-    '> ACCESS GRANTED ██████████ 100%',
+    `INITIALIZING GIZBALLAH SECURE PORTAL v3.1`,
+    `AGENT: ${agent.agentId} — ${agent.codename}`,
+    `CLEARANCE: ${agent.rank} [${agent.rankCode}]`,
+    `LOADING ENCRYPTED MODULES...`,
+    `BIOMETRIC VERIFY: OK`,
+    `ACCESS GRANTED`,
   ];
-  const el = document.getElementById('bootLog');
-  el.innerHTML = '';
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('bootScreen').style.display = 'flex';
-
-  for (const line of lines) {
-    await sleep(280);
-    el.innerHTML += line + '\n';
-  }
-  await sleep(600);
-  document.getElementById('bootScreen').style.display = 'none';
+  document.getElementById('loginWrap').style.display='none';
+  document.getElementById('bootWrap').style.display='flex';
+  const el = document.getElementById('bootLines');
+  el.textContent='';
+  for (const l of lines) { await sleep(240); el.textContent += '> '+l+'\n'; }
+  await sleep(500);
+  document.getElementById('bootWrap').style.display='none';
 }
 
-// ── DASHBOARD ──────────────────────────────────────────────────────────────
-function showDashboard() {
-  document.getElementById('dashboard').style.display = 'flex';
-  renderAgentHeader();
-  renderSalaryCard();
-  loadTohuState();
-  loadTasks();
+function startDashboard() {
+  document.getElementById('dashboard').style.display='flex';
+  // Header
+  document.getElementById('hdrEmoji').textContent = agent.emoji;
+  document.getElementById('hdrName').textContent  = agent.codename;
+  document.getElementById('hdrRank').textContent  = agent.rank;
+  document.getElementById('hdrId').textContent    = agent.agentId;
 
-  const isPresident = currentAgent.rankCode === 'PRESIDENT';
-  const isALG       = currentAgent.rankCode === 'ALG';
+  // Show/hide tabs based on rank
+  const isPresident = agent.rankCode==='PRESIDENT';
+  const isCommander = RANK_ORDER.indexOf(agent.rankCode) >= RANK_ORDER.indexOf('ALG');
+  if (isPresident) document.getElementById('tabTohu').style.display='flex';
+  if (isPresident) document.getElementById('tabCouncil').style.display='flex';
+  if (isPresident) document.getElementById('tabGpass').style.display='flex';
+  if (isCommander) document.getElementById('tabTasks').style.display='flex';
 
-  document.getElementById('tohuPanel').style.display    = isPresident ? 'block' : 'none';
-  document.getElementById('salaryMgmtPanel').style.display = isPresident ? 'block' : 'none';
-  document.getElementById('addTaskPanel').style.display = (isPresident || isALG) ? 'block' : 'none';
+  // Subscriptions
+  subBank();
+  subTohu();
+  subAlerts();
+  if (isCommander) subTasks();
+  else subMyTasks();
 
-  if (isPresident) renderSalaryMgmt();
-  renderTohuBanner();
+  switchTab('bank');
 }
 
-function renderAgentHeader() {
-  document.getElementById('agentName').textContent    = currentAgent.codename;
-  document.getElementById('agentRank').textContent    = currentAgent.rank;
-  document.getElementById('agentId').textContent      = currentAgent.agentId;
-  document.getElementById('agentEmoji').textContent   = currentAgent.emoji;
-}
-
-function renderSalaryCard() {
-  document.getElementById('salaryAmount').textContent = formatSalary(currentAgent.salary);
-}
-
-function formatSalary(n) {
-  const num = Number(n);
-  if (num >= 1e15) return (num/1e15).toFixed(1) + ' קודריליון BTC';
-  if (num >= 1e12) return (num/1e12).toFixed(1) + ' טריליון BTC';
-  if (num >= 1e9)  return (num/1e9).toFixed(1)  + ' מיליארד BTC';
-  if (num >= 1e6)  return (num/1e6).toFixed(1)  + ' מיליון BTC';
-  return num.toLocaleString() + ' BTC';
-}
-
-// ── TOHU STATE ─────────────────────────────────────────────────────────────
-function loadTohuState() {
-  if (unsubTohu) unsubTohu();
-  unsubTohu = onSnapshot(doc(db, 'system', 'tohu'), snap => {
-    tohuState = snap.data();
-    renderTohuBanner();
-    renderTohuPanel();
+// ── BANK ─────────────────────────────────────────────────────────────────
+function subBank() {
+  if (bankSub) bankSub();
+  bankSub = onSnapshot(doc(db,'banks',agent.agentId), snap => {
+    bankData = snap.data();
+    renderBank();
   });
 }
 
-function renderTohuBanner() {
-  const banner = document.getElementById('tohuBanner');
-  if (!tohuState || !tohuState.active) {
-    banner.style.display = 'none';
-    document.body.classList.remove('tohu-active');
-    return;
-  }
-  const lvl = TOHU_LEVELS[tohuState.level];
-  banner.style.display = 'flex';
-  banner.style.borderColor = lvl.color;
-  banner.style.color = lvl.color;
-  banner.innerHTML = `⚠ קוד תוהו ${tohuState.level} פעיל — ${lvl.name} ⚠`;
-  document.body.classList.add('tohu-active');
-  document.body.style.setProperty('--tohu-color', lvl.color);
+async function renderBank() {
+  const txSnap = await getDocs(query(
+    collection(db,'banks',agent.agentId,'transactions'),
+    orderBy('createdAt','desc')
+  ));
+  const txs = txSnap.docs.map(d=>({id:d.id,...d.data()}));
+  const balance = bankData?.balance ?? 0;
+
+  // Get salary from agent doc
+  const agSnap = await getDoc(doc(db,'agents',agent.agentId));
+  const salary = agSnap.data()?.salary ?? agent.baseSalary;
+
+  document.getElementById('bankContent').innerHTML = `
+    <div class="bank-hero">
+      <div class="bank-balance-label">יתרת חשבון</div>
+      <div class="bank-balance">${fmtBTC(balance)}</div>
+      <div class="bank-salary-row">
+        <span class="bank-salary-label">משכורת חודשית</span>
+        <span class="bank-salary-val">${fmtBTC(salary)}</span>
+      </div>
+    </div>
+    ${agent.rankCode==='PRESIDENT' ? presidentBankControls() : ''}
+    <div class="tx-section">
+      <div class="section-label">עובר ושב</div>
+      ${txs.length ? txs.map(tx=>`
+        <div class="tx-row">
+          <div class="tx-info">
+            <div class="tx-desc">${esc(tx.description||'')}</div>
+            <div class="tx-date">${tx.createdAt?fmtDate(tx.createdAt.toDate()):'—'}</div>
+          </div>
+          <div class="tx-amount ${tx.amount>=0?'tx-in':'tx-out'}">${tx.amount>=0?'+':''}${fmtBTC(tx.amount)}</div>
+        </div>`).join('') : '<div class="empty">אין פעולות עדיין</div>'}
+    </div>`;
+
+  if (agent.rankCode==='PRESIDENT') bindPresidentBank();
 }
 
-function renderTohuPanel() {
-  if (currentAgent.rankCode !== 'PRESIDENT') return;
-  const panel = document.getElementById('tohuControls');
-
-  if (tohuState && tohuState.active) {
-    const lvl = TOHU_LEVELS[tohuState.level];
-    panel.innerHTML = `
-      <div class="tohu-active-info" style="border-color:${lvl.color};color:${lvl.color}">
-        <div class="tohu-active-title">⚠ ${lvl.name} פעיל</div>
-        <div class="tohu-active-desc">${lvl.desc}</div>
-        <div class="tohu-active-meta">הופעל על ידי: ${tohuState.activatedBy || '—'}</div>
+function presidentBankControls() {
+  const opts = Object.entries(AGENTS).map(([id,a])=>
+    `<option value="${id}">${a.emoji} ${a.codename}</option>`).join('');
+  return `
+    <div class="ctrl-card">
+      <div class="ctrl-title">ניהול פיננסי — נשיא</div>
+      <div class="ctrl-row">
+        <select class="inp-select" id="fineTarget">${opts}</select>
+        <input type="number" class="inp-text" id="fineAmount" placeholder="סכום קנס (BTC)">
+        <button class="btn btn-danger" id="fineBtn">הפעל קנס</button>
       </div>
-      <button class="btn btn-deactivate" onclick="deactivateTohu()">■ כבה קוד תוהו</button>`;
-  } else {
-    panel.innerHTML = `
-      <div class="tohu-select-row">
-        <label class="field-label">בחר רמת תוהו:</label>
-        <div class="tohu-level-grid">
-          ${Object.entries(TOHU_LEVELS).map(([lvl, data]) => `
-            <div class="tohu-level-card" data-level="${lvl}" onclick="selectTohuLevel(${lvl})" style="--tc:${data.color}">
-              <div class="tlc-num">${lvl}</div>
-              <div class="tlc-name">${data.name}</div>
-            </div>`).join('')}
-        </div>
+      <div class="ctrl-row">
+        <select class="inp-select" id="salTarget">${opts}</select>
+        <input type="number" class="inp-text" id="salAmount" placeholder="משכורת חדשה">
+        <button class="btn btn-primary" id="salBtn">עדכן משכורת</button>
       </div>
-      <div id="tohuLevelDesc" class="tohu-desc-box"></div>
-      <button class="btn btn-activate" id="activateTohuBtn" onclick="activateTohu()" disabled>▶ הפעל קוד תוהו</button>`;
-  }
-}
-
-let selectedTohuLevel = null;
-window.selectTohuLevel = function(lvl) {
-  selectedTohuLevel = lvl;
-  document.querySelectorAll('.tohu-level-card').forEach(c => c.classList.remove('selected'));
-  document.querySelector(`.tohu-level-card[data-level="${lvl}"]`)?.classList.add('selected');
-  const desc = TOHU_LEVELS[lvl];
-  document.getElementById('tohuLevelDesc').innerHTML = `
-    <div style="color:${desc.color};font-weight:700;margin-bottom:6px">${desc.name}</div>
-    <div style="color:#aaa;font-size:0.82rem;line-height:1.7">${desc.desc}</div>`;
-  document.getElementById('activateTohuBtn').disabled = false;
-};
-
-window.activateTohu = async function() {
-  if (!selectedTohuLevel) return;
-  if (!confirm(`אשר הפעלת קוד תוהו ${selectedTohuLevel}?`)) return;
-  await updateDoc(doc(db,'system','tohu'), {
-    active: true, level: selectedTohuLevel,
-    activatedAt: serverTimestamp(), activatedBy: currentAgent.codename
-  });
-  log(`קוד תוהו ${selectedTohuLevel} הופעל`);
-};
-
-window.deactivateTohu = async function() {
-  if (!confirm('אשר כיבוי קוד תוהו?')) return;
-  await updateDoc(doc(db,'system','tohu'), {
-    active:false, level:0, activatedAt:null, activatedBy:null
-  });
-  selectedTohuLevel = null;
-  log('קוד תוהו כובה');
-};
-
-// ── SALARY MANAGEMENT ──────────────────────────────────────────────────────
-function renderSalaryMgmt() {
-  const container = document.getElementById('salaryList');
-  container.innerHTML = Object.entries(AGENTS).map(([id, ag]) => `
-    <div class="salary-row">
-      <span class="salary-agent">${ag.emoji} ${ag.codename} <span class="salary-rank">(${ag.rank})</span></span>
-      <div class="salary-edit-row">
-        <input type="text" class="salary-input" id="sal_${id}" value="${formatSalary(ag.salary)}" placeholder="סכום חדש">
-        <button class="btn btn-sm" onclick="saveSalary('${id}')">שמור</button>
-      </div>
-    </div>`).join('');
-}
-
-window.saveSalary = async function(agentId) {
-  const inp = document.getElementById('sal_'+agentId);
-  const raw = inp.value.replace(/[^\d.]/g,'');
-  const num = parseFloat(raw);
-  if (isNaN(num)) { log('ערך לא תקין'); return; }
-  await updateDoc(doc(db,'agents',agentId), { salary: num });
-  AGENTS[agentId].salary = num;
-  if (currentAgent.agentId === agentId) {
-    currentAgent.salary = num;
-    renderSalaryCard();
-  }
-  log(`משכורת ${AGENTS[agentId].codename} עודכנה`);
-  inp.style.borderColor = '#39ff14';
-  setTimeout(() => inp.style.borderColor = '', 1500);
-};
-
-// ── TASKS ──────────────────────────────────────────────────────────────────
-function loadTasks() {
-  if (unsubTasks) unsubTasks();
-  const q = query(collection(db,'tasks'), orderBy('createdAt','desc'));
-  unsubTasks = onSnapshot(q, snap => {
-    tasks = snap.docs.map(d => ({id:d.id,...d.data()}));
-    renderTasks();
-  });
-
-  // Populate assignee selector
-  const sel = document.getElementById('taskAssignee');
-  if (sel) {
-    sel.innerHTML = '<option value="">— בחר סוכן —</option>'
-      + Object.entries(AGENTS).map(([id,ag]) =>
-        `<option value="${id}">${ag.emoji} ${ag.codename} (${ag.rank})</option>`
-      ).join('');
-  }
-}
-
-function renderTasks() {
-  const container = document.getElementById('tasksList');
-  const myTasks   = currentAgent.rankCode === 'PRESIDENT' || currentAgent.rankCode === 'ALG'
-    ? tasks
-    : tasks.filter(t => t.assigneeId === currentAgent.agentId);
-
-  if (!myTasks.length) {
-    container.innerHTML = '<div class="empty-msg">// אין משימות פעילות</div>';
-    return;
-  }
-
-  container.innerHTML = myTasks.map(t => {
-    const assignee = AGENTS[t.assigneeId];
-    const canDelete = currentAgent.rankCode === 'PRESIDENT' || currentAgent.rankCode === 'ALG';
-    const isAssigned = t.assigneeId === currentAgent.agentId;
-    return `
-    <div class="task-card ${t.status==='done'?'task-done':''}">
-      <div class="task-header">
-        <span class="task-priority p-${t.priority||'medium'}">${priorityLabel(t.priority)}</span>
-        <span class="task-id">#${t.id.slice(-4).toUpperCase()}</span>
-      </div>
-      <div class="task-title">${esc(t.title)}</div>
-      ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
-      <div class="task-footer">
-        <span class="task-assignee">${assignee?.emoji||'?'} ${assignee?.codename||t.assigneeId}</span>
-        <span class="task-status s-${t.status}">${statusLabel(t.status)}</span>
-      </div>
-      <div class="task-actions">
-        ${isAssigned && t.status!=='done' ? `<button class="btn btn-sm btn-done" onclick="completeTask('${t.id}')">✓ סיים</button>` : ''}
-        ${canDelete ? `<button class="btn btn-sm btn-del" onclick="deleteTask('${t.id}')">✕</button>` : ''}
+      <div class="ctrl-row">
+        <button class="btn btn-secondary" id="paydayBtn" style="width:100%">💰 שלם משכורות לכולם</button>
       </div>
     </div>`;
-  }).join('');
 }
 
-function priorityLabel(p) {
-  return p === 'high' ? '🔴 גבוה' : p === 'low' ? '🟢 נמוך' : '🟡 בינוני';
+function bindPresidentBank() {
+  document.getElementById('fineBtn')?.addEventListener('click', async () => {
+    const tgt = document.getElementById('fineTarget').value;
+    const amt = parseFloat(document.getElementById('fineAmount').value);
+    if (!tgt||isNaN(amt)||amt<=0) return notify('ערך לא תקין','error');
+    await chargeAgent(tgt, -amt, `קנס מהנשיא`);
+    notify(`קנס הופחת מ-${AGENTS[tgt].codename}`,'success');
+  });
+  document.getElementById('salBtn')?.addEventListener('click', async () => {
+    const tgt = document.getElementById('salTarget').value;
+    const amt = parseFloat(document.getElementById('salAmount').value);
+    if (!tgt||isNaN(amt)) return notify('ערך לא תקין','error');
+    await updateDoc(doc(db,'agents',tgt),{salary:amt});
+    if (tgt===agent.agentId) agent.salary=amt;
+    notify(`משכורת ${AGENTS[tgt].codename} עודכנה`,'success');
+  });
+  document.getElementById('paydayBtn')?.addEventListener('click', async () => {
+    for (const [id] of Object.entries(AGENTS)) {
+      const aSnap = await getDoc(doc(db,'agents',id));
+      const sal = aSnap.data()?.salary ?? AGENTS[id].baseSalary;
+      if (sal>0) await chargeAgent(id, sal, 'משכורת חודשית');
+    }
+    notify('משכורות שולמו לכולם','success');
+  });
 }
-function statusLabel(s) {
-  return s === 'done' ? '✓ הושלם' : s === 'in_progress' ? '⟳ בביצוע' : '○ ממתין';
+
+async function chargeAgent(agentId, amount, description) {
+  await updateDoc(doc(db,'banks',agentId),{balance:increment(amount)});
+  await addDoc(collection(db,'banks',agentId,'transactions'),{
+    amount, description, createdAt:serverTimestamp()
+  });
+}
+
+// ── SHOP ────────────────────────────────────────────────────────────────
+function renderShop() {
+  const weapons  = SHOP_ITEMS.filter(i=>i.category==='weapon');
+  const tactical = SHOP_ITEMS.filter(i=>i.category==='tactical');
+  document.getElementById('shopContent').innerHTML = `
+    <div class="shop-section">
+      <div class="section-label">🔫 נשק</div>
+      <div class="shop-grid">${weapons.map(shopCard).join('')}</div>
+    </div>
+    <div class="shop-section">
+      <div class="section-label">🛡️ ציוד טקטי</div>
+      <div class="shop-grid">${tactical.map(shopCard).join('')}</div>
+    </div>`;
+}
+
+function shopCard(item) {
+  return `<div class="item-card">
+    <div class="item-emoji">${item.emoji}</div>
+    <div class="item-name">${item.name}</div>
+    <div class="item-desc">${item.desc}</div>
+    <div class="item-price">${fmtBTC(item.price)}</div>
+    <button class="btn btn-primary btn-sm" onclick="buyItem('${item.id}','${item.name}',${item.price})">רכוש</button>
+  </div>`;
+}
+
+window.buyItem = async function(id, name, price) {
+  const bSnap = await getDoc(doc(db,'banks',agent.agentId));
+  const bal   = bSnap.data()?.balance ?? 0;
+  if (bal < price) { notify('יתרה לא מספקת','error'); return; }
+  await chargeAgent(agent.agentId, -price, `רכישה: ${name}`);
+  notify(`${name} נרכש בהצלחה`,'success');
+};
+
+// ── GIZMED ─────────────────────────────────────────────────────────────
+function renderGizmed() {
+  document.getElementById('gizmedContent').innerHTML = `
+    <div class="gizmed-header">
+      <div class="gizmed-logo">⚕️</div>
+      <div>
+        <div class="gizmed-title">GIZMEDА — השירות הרפואי</div>
+        <div class="gizmed-sub">טיפול רפואי מסווג לסוכני הגיזבאללה</div>
+      </div>
+    </div>
+    <div class="section-label" style="margin-bottom:12px">שירותים זמינים</div>
+    <div class="shop-grid">${MED_ITEMS.map(medCard).join('')}</div>`;
+}
+
+function medCard(item) {
+  return `<div class="item-card item-med">
+    <div class="item-emoji">${item.emoji}</div>
+    <div class="item-name">${item.name}</div>
+    <div class="item-desc">${item.desc}</div>
+    <div class="item-price">${fmtBTC(item.price)}</div>
+    <button class="btn btn-accent btn-sm" onclick="buyItem('${item.id}','${item.name}',${item.price})">בקש</button>
+  </div>`;
+}
+
+// ── ALERTS ─────────────────────────────────────────────────────────────
+function subAlerts() {
+  if (alertsSub) alertsSub();
+  alertsSub = onSnapshot(
+    query(collection(db,'alerts'), where('toId','==',agent.agentId), orderBy('createdAt','desc')),
+    snap => {
+      const alerts = snap.docs.map(d=>({id:d.id,...d.data()}));
+      renderAlerts(alerts);
+      const unread = alerts.filter(a=>!a.read).length;
+      document.getElementById('alertBadge').textContent = unread||'';
+      document.getElementById('alertBadge').style.display = unread?'flex':'none';
+    }
+  );
+}
+
+function renderAlerts(alerts) {
+  const myRankIdx = RANK_ORDER.indexOf(agent.rankCode);
+  // Who can I alert? agents with LOWER rank than me
+  const targets = Object.entries(AGENTS).filter(([id,a])=>
+    RANK_ORDER.indexOf(a.rankCode) < myRankIdx && id !== agent.agentId
+  );
+
+  document.getElementById('alertsContent').innerHTML = `
+    ${targets.length ? `
+    <div class="ctrl-card">
+      <div class="ctrl-title">שלח התראה</div>
+      <div class="ctrl-col">
+        <select class="inp-select" id="alertTarget">
+          <option value="">— בחר סוכן —</option>
+          ${targets.map(([id,a])=>`<option value="${id}">${a.emoji} ${a.codename} (${a.rank})</option>`).join('')}
+        </select>
+        <input type="text" class="inp-text" id="alertMsg" placeholder="תוכן ההתראה..." style="width:100%">
+        <select class="inp-select" id="alertLevel">
+          <option value="info">ℹ️ מידע</option>
+          <option value="warning">⚠️ אזהרה</option>
+          <option value="critical">🚨 קריטי</option>
+        </select>
+        <button class="btn btn-primary" onclick="sendAlert()">שלח התראה</button>
+      </div>
+    </div>` : ''}
+    <div class="section-label">התראות שהתקבלו</div>
+    ${alerts.length ? alerts.map(a=>`
+      <div class="alert-card al-${a.level||'info'} ${a.read?'al-read':''}">
+        <div class="al-header">
+          <span class="al-from">${AGENTS[a.fromId]?.emoji||'?'} ${AGENTS[a.fromId]?.codename||a.fromId}</span>
+          <span class="al-date">${a.createdAt?fmtDate(a.createdAt.toDate()):'—'}</span>
+        </div>
+        <div class="al-msg">${esc(a.message)}</div>
+        ${!a.read?`<button class="btn btn-sm btn-ghost" onclick="markRead('${a.id}')">סמן כנקרא</button>`:''}
+      </div>`).join('') : '<div class="empty">אין התראות</div>'}`;
+}
+
+window.sendAlert = async function() {
+  const to  = document.getElementById('alertTarget').value;
+  const msg = document.getElementById('alertMsg').value.trim();
+  const lvl = document.getElementById('alertLevel').value;
+  if (!to||!msg) { notify('מלא את כל השדות','error'); return; }
+  await addDoc(collection(db,'alerts'),{
+    toId:to, fromId:agent.agentId, message:msg, level:lvl,
+    read:false, createdAt:serverTimestamp()
+  });
+  document.getElementById('alertMsg').value='';
+  notify('התראה נשלחה','success');
+};
+
+window.markRead = async function(id) {
+  await updateDoc(doc(db,'alerts',id),{read:true});
+};
+
+// ── TASKS ────────────────────────────────────────────────────────────────
+function subTasks() {
+  if (tasksSub) tasksSub();
+  tasksSub = onSnapshot(query(collection(db,'tasks'),orderBy('createdAt','desc')), snap=>{
+    renderTasksView(snap.docs.map(d=>({id:d.id,...d.data()})));
+  });
+}
+
+function subMyTasks() {
+  if (tasksSub) tasksSub();
+  tasksSub = onSnapshot(
+    query(collection(db,'tasks'),where('assigneeId','==',agent.agentId),orderBy('createdAt','desc')),
+    snap=>renderTasksView(snap.docs.map(d=>({id:d.id,...d.data()})))
+  );
+}
+
+function renderTasksView(tasks) {
+  const isCommander = RANK_ORDER.indexOf(agent.rankCode) >= RANK_ORDER.indexOf('ALG');
+  const agentOpts = Object.entries(AGENTS).map(([id,a])=>
+    `<option value="${id}">${a.emoji} ${a.codename}</option>`).join('');
+
+  document.getElementById('tasksContent').innerHTML = `
+    ${isCommander ? `
+    <div class="ctrl-card">
+      <div class="ctrl-title">הוסף משימה</div>
+      <div class="ctrl-col">
+        <input type="text" class="inp-text" id="tTitle" placeholder="כותרת משימה" style="width:100%">
+        <textarea class="inp-textarea" id="tDesc" placeholder="תיאור (אופציונלי)"></textarea>
+        <div class="ctrl-row">
+          <select class="inp-select" id="tAssignee"><option value="">— שייך לסוכן —</option>${agentOpts}</select>
+          <select class="inp-select" id="tPriority">
+            <option value="high">🔴 גבוהה</option>
+            <option value="medium" selected>🟡 בינונית</option>
+            <option value="low">🟢 נמוכה</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="addTask()">+ הוסף משימה</button>
+      </div>
+    </div>` : ''}
+    <div class="section-label">משימות פעילות</div>
+    <div class="tasks-grid">
+    ${tasks.length ? tasks.map(t=>{
+      const ass = AGENTS[t.assigneeId];
+      const isMine = t.assigneeId===agent.agentId;
+      return `<div class="task-card tc-${t.priority||'medium'} ${t.status==='done'?'tc-done':''}">
+        <div class="tc-header">
+          <span class="tc-badge tp-${t.priority||'medium'}">${t.priority==='high'?'HIGH':t.priority==='low'?'LOW':'MED'}</span>
+          <span class="tc-id">${t.id.slice(-5).toUpperCase()}</span>
+        </div>
+        <div class="tc-title">${esc(t.title)}</div>
+        ${t.description?`<div class="tc-desc">${esc(t.description)}</div>`:''}
+        <div class="tc-footer">
+          <span class="tc-ass">${ass?.emoji||'?'} ${ass?.codename||t.assigneeId}</span>
+          <span class="tc-status ts-${t.status}">${t.status==='done'?'✓ הושלם':t.status==='in_progress'?'⟳ בביצוע':'○ ממתין'}</span>
+        </div>
+        <div class="tc-actions">
+          ${isMine&&t.status!=='done'?`<button class="btn btn-sm btn-accent" onclick="doneTask('${t.id}')">✓ סיים</button>`:''}
+          ${isCommander?`<button class="btn btn-sm btn-ghost btn-danger-h" onclick="delTask('${t.id}')">✕</button>`:''}
+        </div>
+      </div>`;
+    }).join('') : '<div class="empty">אין משימות</div>'}
+    </div>`;
 }
 
 window.addTask = async function() {
-  const title    = document.getElementById('taskTitle').value.trim();
-  const desc     = document.getElementById('taskDesc').value.trim();
-  const assignee = document.getElementById('taskAssignee').value;
-  const priority = document.getElementById('taskPriority').value;
-  if (!title || !assignee) { log('נא למלא כותרת וסוכן'); return; }
-
-  await addDoc(collection(db,'tasks'), {
-    title, description:desc, assigneeId:assignee, priority,
-    status:'pending', createdBy:currentAgent.agentId, createdAt:serverTimestamp()
+  const title    = document.getElementById('tTitle')?.value.trim();
+  const desc     = document.getElementById('tDesc')?.value.trim();
+  const assignee = document.getElementById('tAssignee')?.value;
+  const priority = document.getElementById('tPriority')?.value;
+  if (!title||!assignee) { notify('נא למלא כותרת וסוכן','error'); return; }
+  await addDoc(collection(db,'tasks'),{
+    title,description:desc,assigneeId:assignee,priority,
+    status:'pending',createdBy:agent.agentId,createdAt:serverTimestamp()
   });
-  document.getElementById('taskTitle').value = '';
-  document.getElementById('taskDesc').value  = '';
-  document.getElementById('taskAssignee').value = '';
-  log('משימה נוספה');
+  notify('משימה נוספה','success');
 };
 
-window.completeTask = async function(id) {
-  await updateDoc(doc(db,'tasks',id), { status:'done' });
-  log('משימה הושלמה');
-};
+window.doneTask  = async id => { await updateDoc(doc(db,'tasks',id),{status:'done'}); notify('משימה הושלמה','success'); };
+window.delTask   = async id => { await deleteDoc(doc(db,'tasks',id)); notify('משימה נמחקה','info'); };
 
-window.deleteTask = async function(id) {
-  await deleteDoc(doc(db,'tasks',id));
-  log('משימה נמחקה');
-};
-
-// ── LOG ────────────────────────────────────────────────────────────────────
-function log(msg) {
-  const el = document.getElementById('sysLog');
-  const line = document.createElement('div');
-  line.className = 'log-line';
-  line.textContent = `[${new Date().toLocaleTimeString('he-IL')}] > ${msg}`;
-  el.prepend(line);
-  if (el.children.length > 20) el.lastChild.remove();
+// ── TOHU ────────────────────────────────────────────────────────────────
+function subTohu() {
+  if (tohuSub) tohuSub();
+  tohuSub = onSnapshot(doc(db,'system','tohu'), snap=>{
+    tohuSt = snap.data();
+    updateTohuBanner();
+    if (activeTab==='tohu') renderTohu();
+  });
 }
 
-// ── UTILS ──────────────────────────────────────────────────────────────────
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function updateTohuBanner() {
+  const bar = document.getElementById('tohuBar');
+  if (!tohuSt?.active) { bar.style.display='none'; return; }
+  const lvl = TOHU_LEVELS[tohuSt.level];
+  bar.style.display='block';
+  bar.style.background=lvl.hex+'22';
+  bar.style.borderColor=lvl.hex;
+  bar.style.color=lvl.hex;
+  bar.textContent=`⚠ ${lvl.name} פעיל — ${lvl.desc}`;
+}
 
-window.logout = function() {
-  currentAgent = null;
-  if (unsubTohu)  unsubTohu();
-  if (unsubTasks) unsubTasks();
-  document.getElementById('dashboard').style.display = 'none';
-  document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('agentIdInput').value = '';
-  document.body.classList.remove('tohu-active');
+let selTohu = null;
+function renderTohu() {
+  const active = tohuSt?.active;
+  const lvl    = active ? TOHU_LEVELS[tohuSt.level] : null;
+  document.getElementById('tohuContent').innerHTML = `
+    <div class="tohu-wrap">
+      ${active ? `
+        <div class="tohu-active-card" style="border-color:${lvl.hex};background:${lvl.hex}11">
+          <div class="ta-badge" style="background:${lvl.hex}">⚠</div>
+          <div class="ta-title" style="color:${lvl.hex}">${lvl.name} פעיל</div>
+          <div class="ta-desc">${lvl.desc}</div>
+          <div class="ta-by">הופעל על ידי: ${tohuSt.activatedBy||'—'}</div>
+          <button class="btn btn-ghost" onclick="deactivateTohu()" style="margin-top:12px">■ כבה קוד תוהו</button>
+        </div>` : `
+        <div class="tohu-idle">
+          <div class="section-label">בחר רמת תוהו</div>
+          <div class="tohu-grid">
+            ${Object.entries(TOHU_LEVELS).map(([n,l])=>`
+              <div class="tohu-card ${selTohu==n?'tc-sel':''}" data-lv="${n}"
+                   style="--tc:${l.hex}" onclick="selectTohu(${n})">
+                <div class="tc-num">${n}</div>
+                <div class="tc-lname">${l.name}</div>
+              </div>`).join('')}
+          </div>
+          <div class="tohu-desc" id="tohuDesc">
+            ${selTohu ? `<span style="color:${TOHU_LEVELS[selTohu].hex};font-weight:600">${TOHU_LEVELS[selTohu].name}:</span> ${TOHU_LEVELS[selTohu].desc}` : 'בחר רמה לצפייה בהסבר'}
+          </div>
+          <button class="btn btn-danger btn-full" onclick="activateTohu()" ${!selTohu?'disabled':''}>▶ הפעל קוד תוהו</button>
+        </div>`}
+    </div>`;
+}
+
+window.selectTohu = function(n) {
+  selTohu=n; renderTohu();
+};
+window.activateTohu = async function() {
+  if (!selTohu||!confirm(`אשר הפעלת קוד תוהו ${selTohu}?`)) return;
+  await updateDoc(doc(db,'system','tohu'),{active:true,level:selTohu,activatedBy:agent.codename,activatedAt:serverTimestamp()});
+  selTohu=null; notify(`קוד תוהו ${selTohu||''}  הופעל`,'success');
+};
+window.deactivateTohu = async function() {
+  if (!confirm('אשר כיבוי קוד תוהו?')) return;
+  await updateDoc(doc(db,'system','tohu'),{active:false,level:0,activatedBy:null,activatedAt:null});
+  notify('קוד תוהו כובה','info');
 };
 
-// ── KEYBOARD ───────────────────────────────────────────────────────────────
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
-    window.doLogin();
-  }
-});
+// ── FALCON COUNCIL (president only) ─────────────────────────────────────
+function renderCouncil() {
+  document.getElementById('councilContent').innerHTML = `
+    <div class="council-header">
+      <span class="council-emblem">🦅</span>
+      <div>
+        <div class="council-title">מועצת הנץ</div>
+        <div class="council-sub">ממשק בלעדי לנשיא הגיזבאללה</div>
+      </div>
+    </div>
+    <div class="council-body">
+      <p>מועצת הנץ היא הגוף השיפוטי העליון של הגיזבאללה. כל דיון, פסיקה ועונש עוברים דרך הממשק המאובטח.</p>
+      <a href="falcon_council.html" class="btn btn-primary" style="margin-top:16px;display:inline-block;text-decoration:none">
+        פתח ממשק מועצת הנץ ←
+      </a>
+    </div>`;
+}
 
-// ── BOOT ───────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', async () => {
-  await initFirestore();
+// ── G-PASS ──────────────────────────────────────────────────────────────
+async function renderGpass() {
+  const snap = await getDocs(query(collection(db,'gpasses'),orderBy('createdAt','desc')));
+  const passes = snap.docs.map(d=>({id:d.id,...d.data()}));
+  document.getElementById('gpassContent').innerHTML = `
+    <div class="gpass-header">
+      <div class="gpass-badge">G</div>
+      <div>
+        <div class="gpass-title">G-PASS — אישור בשם בולוק</div>
+        <div class="gpass-sub">אישור מיוחד מוענק על ידי הנשיא בלבד</div>
+      </div>
+    </div>
+    <div class="ctrl-card">
+      <div class="ctrl-title">הנפק G-PASS חדש</div>
+      <div class="ctrl-col">
+        <input type="text" class="inp-text" id="gpName" placeholder="שם מקבל הפאס (שם / כינוי חופשי)" style="width:100%">
+        <textarea class="inp-textarea" id="gpDedication" placeholder="הקדשה / מטרת האישור"></textarea>
+        <button class="btn btn-primary" onclick="issueGpass()">הנפק G-PASS</button>
+      </div>
+    </div>
+    <div class="section-label">פאסים פעילים</div>
+    ${passes.length ? passes.map(p=>`
+      <div class="gpass-card">
+        <div class="gpass-card-header">
+          <span class="gpass-card-id">G-PASS #${p.id.slice(-6).toUpperCase()}</span>
+          <span class="gpass-card-date">${p.createdAt?fmtDate(p.createdAt.toDate()):'—'}</span>
+        </div>
+        <div class="gpass-card-name">מוענק ל: ${esc(p.recipientName)}</div>
+        <div class="gpass-card-ded">${esc(p.dedication||'')}</div>
+        <div class="gpass-card-footer">
+          <span class="gpass-seal">בולוק — אושר</span>
+          <button class="btn btn-sm btn-ghost btn-danger-h" onclick="revokeGpass('${p.id}')">בטל</button>
+        </div>
+      </div>`).join('') : '<div class="empty">אין G-PASSים פעילים</div>'}`;
+}
+
+window.issueGpass = async function() {
+  const name = document.getElementById('gpName').value.trim();
+  const ded  = document.getElementById('gpDedication').value.trim();
+  if (!name) { notify('נא להזין שם','error'); return; }
+  await addDoc(collection(db,'gpasses'),{
+    recipientName:name, dedication:ded,
+    issuedBy:agent.agentId, createdAt:serverTimestamp()
+  });
+  notify('G-PASS הונפק','success');
+  renderGpass();
+};
+
+window.revokeGpass = async function(id) {
+  if (!confirm('בטל את הפאס הזה?')) return;
+  await deleteDoc(doc(db,'gpasses',id));
+  notify('פאס בוטל','info');
+  renderGpass();
+};
+
+// ── TAB SYSTEM ────────────────────────────────────────────────────────────
+window.switchTab = function(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.style.display='none');
+  document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
+  document.getElementById(`pane-${tab}`).style.display='block';
+  // render on switch
+  if (tab==='bank')    renderBank();
+  if (tab==='shop')    renderShop();
+  if (tab==='gizmed')  renderGizmed();
+  if (tab==='alerts')  { /* live sub */ }
+  if (tab==='tohu')    renderTohu();
+  if (tab==='council') renderCouncil();
+  if (tab==='gpass')   renderGpass();
+};
+
+window.logout = function() {
+  agent=null;
+  [alertsSub,tasksSub,tohuSub,bankSub].forEach(u=>u&&u());
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('loginWrap').style.display='flex';
+  document.getElementById('loginId').value='';
+};
+
+// ── NOTIFY ────────────────────────────────────────────────────────────────
+function notify(msg, type='info') {
+  const el = document.getElementById('notify');
+  el.textContent=msg;
+  el.className='notify show n-'+type;
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+function fmtBTC(n) {
+  const v=Number(n);
+  if(v>=1e15) return (v/1e15).toFixed(2)+' Q BTC';
+  if(v>=1e12) return (v/1e12).toFixed(2)+' T BTC';
+  if(v>=1e9)  return (v/1e9).toFixed(2)+' B BTC';
+  if(v>=1e6)  return (v/1e6).toFixed(2)+' M BTC';
+  if(v<0) {
+    const a=Math.abs(v);
+    if(a>=1e15) return '-'+(a/1e15).toFixed(2)+' Q BTC';
+    if(a>=1e12) return '-'+(a/1e12).toFixed(2)+' T BTC';
+    if(a>=1e9)  return '-'+(a/1e9).toFixed(2)+' B BTC';
+  }
+  return v.toLocaleString()+' BTC';
+}
+function fmtDate(d) {
+  return d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.getElementById('loginWrap').style.display!=='none') doLogin();
 });
 </script>
 
 <style>
 :root {
-  --green: #39ff14;
-  --green-dim: rgba(57,255,20,0.15);
-  --green-glow: rgba(57,255,20,0.06);
-  --dark: #040a04;
-  --dark2: #070f07;
-  --dark3: #0a160a;
-  --border: rgba(57,255,20,0.2);
-  --text: #c8e8c8;
-  --dim: #4a6a4a;
-  --red: #ff3030;
-  --yellow: #ffcc00;
-  --orange: #ff8800;
-  --tohu-color: #39ff14;
-  --r: 4px;
+  --bg:    #0a0b0f;
+  --bg2:   #0f1117;
+  --bg3:   #151821;
+  --glass: rgba(255,255,255,0.03);
+  --b1:    rgba(255,255,255,0.07);
+  --b2:    rgba(255,255,255,0.12);
+  --text:  #e8eaf0;
+  --dim:   #6b7280;
+  --dim2:  #4b5563;
+  --acc:   #6366f1;  /* indigo */
+  --acc2:  #818cf8;
+  --green: #22c55e;
+  --red:   #ef4444;
+  --yellow:#eab308;
+  --r:     10px;
+  --r2:    6px;
 }
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-
-/* CRT effect */
-body {
-  font-family: 'Share Tech Mono', monospace;
-  background: var(--dark);
-  color: var(--green);
-  min-height: 100vh;
-  direction: rtl;
-  overflow-x: hidden;
-  position: relative;
-}
-body::before {
-  content:'';
-  position:fixed;inset:0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,0.08) 2px,
-    rgba(0,0,0,0.08) 4px
-  );
-  pointer-events:none;z-index:9999;
-}
-body::after {
-  content:'';
-  position:fixed;inset:0;
-  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 100%);
-  pointer-events:none;z-index:9998;
-}
-
-/* TOHU active pulse */
-body.tohu-active {
-  animation: tohuPulse 2s ease-in-out infinite;
-}
-@keyframes tohuPulse {
-  0%,100% { box-shadow: inset 0 0 0px transparent; }
-  50%      { box-shadow: inset 0 0 30px rgba(255,0,0,0.1); }
-}
-
-/* ── LOGIN SCREEN ───────────────────────────────────────────────────────── */
-#loginScreen {
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
+body{
+  font-family:'Heebo',sans-serif;
+  background:var(--bg);
+  color:var(--text);
   min-height:100vh;
-  padding:24px;
-  position:relative;
-  z-index:1;
+  direction:rtl;
+  overflow-x:hidden;
 }
-.login-box {
-  width:100%;max-width:440px;
-  border:1px solid var(--border);
-  background:var(--dark2);
+/* subtle grid bg */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:
+    linear-gradient(rgba(99,102,241,0.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(99,102,241,0.03) 1px,transparent 1px);
+  background-size:32px 32px;
+  pointer-events:none;z-index:0;
+}
+
+/* ── LOGIN ─────────────────────────────────────────────────────────────── */
+#loginWrap{
+  position:relative;z-index:1;
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;padding:24px;
+}
+.login-card{
+  width:100%;max-width:400px;
+  background:var(--bg2);
+  border:1px solid var(--b1);
+  border-radius:16px;
   padding:40px 36px;
-  box-shadow:0 0 40px rgba(57,255,20,0.08), inset 0 0 20px rgba(57,255,20,0.02);
-  position:relative;
+  box-shadow:0 24px 64px rgba(0,0,0,0.4),0 0 0 1px rgba(99,102,241,0.1);
 }
-.login-box::before {
-  content:'TOP SECRET // CLASSIFIED';
-  position:absolute;top:-10px;right:16px;
-  font-size:0.55rem;letter-spacing:0.25em;
-  color:var(--red);
-  background:var(--dark);
-  padding:0 8px;
+.login-emblem{
+  text-align:center;margin-bottom:28px;
 }
-.login-logo {
-  text-align:center;
-  margin-bottom:32px;
-}
-.login-logo .logo-badge {
-  width:64px;height:64px;
-  border:2px solid var(--green);
+.login-emblem .ring{
+  width:60px;height:60px;
   border-radius:50%;
+  background:linear-gradient(135deg,#6366f1,#4f46e5);
   display:inline-flex;align-items:center;justify-content:center;
-  font-size:1.8rem;
-  box-shadow:0 0 20px rgba(57,255,20,0.3);
-  animation:logoPulse 3s ease-in-out infinite;
+  font-size:1.6rem;
+  box-shadow:0 0 24px rgba(99,102,241,0.3);
   margin-bottom:12px;
 }
-@keyframes logoPulse {
-  0%,100%{box-shadow:0 0 20px rgba(57,255,20,0.3)}
-  50%{box-shadow:0 0 40px rgba(57,255,20,0.6)}
-}
-.login-logo .org-name {
-  display:block;font-size:1.1rem;letter-spacing:0.2em;
-  text-shadow:0 0 12px var(--green);
-}
-.login-logo .org-sub {
-  display:block;font-size:0.6rem;color:var(--dim);letter-spacing:0.3em;margin-top:4px;
-}
-.field-label {
-  display:block;font-size:0.65rem;letter-spacing:0.2em;color:var(--dim);margin-bottom:6px;
-}
-.login-input {
-  width:100%;padding:10px 14px;
-  background:var(--dark3);
-  border:1px solid var(--border);
-  color:var(--green);
-  font-family:'Share Tech Mono',monospace;font-size:1rem;
-  direction:ltr;letter-spacing:0.2em;text-align:center;
+.login-title{font-size:1.1rem;font-weight:700;letter-spacing:0.08em;color:var(--text)}
+.login-sub{font-size:0.65rem;color:var(--dim);letter-spacing:0.15em;margin-top:3px}
+.login-label{display:block;font-size:0.68rem;color:var(--dim);margin-bottom:7px;letter-spacing:0.1em}
+.login-inp{
+  width:100%;padding:11px 14px;
+  background:var(--bg3);border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--text);font-family:'DM Mono',monospace;font-size:1rem;
+  letter-spacing:0.25em;text-align:center;direction:ltr;
   transition:border-color 0.2s,box-shadow 0.2s;
 }
-.login-input:focus {
-  outline:none;
-  border-color:var(--green);
-  box-shadow:0 0 12px rgba(57,255,20,0.2);
+.login-inp:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(99,102,241,0.15)}
+.login-inp::placeholder{color:var(--dim2);letter-spacing:0.1em}
+.login-btn{
+  width:100%;margin-top:14px;padding:11px;
+  background:linear-gradient(135deg,#6366f1,#4f46e5);
+  border:none;border-radius:var(--r2);
+  color:#fff;font-family:'Heebo',sans-serif;font-weight:600;font-size:0.88rem;
+  cursor:pointer;letter-spacing:0.05em;
+  transition:all 0.2s;box-shadow:0 4px 14px rgba(99,102,241,0.3);
 }
-.login-input::placeholder{color:var(--dim)}
-.login-btn {
-  width:100%;margin-top:16px;padding:12px;
-  background:transparent;border:1px solid var(--green);
-  color:var(--green);font-family:'Share Tech Mono',monospace;
-  font-size:0.85rem;letter-spacing:0.2em;cursor:pointer;
-  transition:all 0.2s;
-}
-.login-btn:hover{background:var(--green-dim);box-shadow:0 0 16px rgba(57,255,20,0.2)}
-.login-btn:disabled{opacity:0.4;cursor:not-allowed}
-.login-error {
-  margin-top:12px;font-size:0.7rem;color:var(--red);
+.login-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,0.4)}
+.login-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+.login-err{
+  margin-top:10px;font-size:0.7rem;color:var(--red);
   text-align:center;opacity:0;transition:opacity 0.3s;
-  letter-spacing:0.1em;
+  font-family:'DM Mono',monospace;letter-spacing:0.05em;
 }
+.login-err.show{opacity:1}
+.login-secure{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  margin-top:20px;font-size:0.6rem;color:var(--dim2);letter-spacing:0.1em;
+}
+.lock-icon{font-size:0.7rem;color:var(--green)}
 
-/* ── BOOT SCREEN ────────────────────────────────────────────────────────── */
-#bootScreen {
-  display:none;
-  position:fixed;inset:0;
-  background:var(--dark);
-  z-index:100;
+/* ── BOOT ──────────────────────────────────────────────────────────────── */
+#bootWrap{
+  display:none;position:fixed;inset:0;
+  background:var(--bg);z-index:100;
   align-items:center;justify-content:center;
-  flex-direction:column;
-  padding:40px;
+  flex-direction:column;gap:8px;padding:40px;
 }
-#bootLog {
-  font-size:0.8rem;letter-spacing:0.05em;
-  white-space:pre-line;line-height:2;
-  text-shadow:0 0 8px var(--green);
-  max-width:600px;width:100%;
+#bootLines{
+  font-family:'DM Mono',monospace;font-size:0.78rem;
+  color:var(--acc2);line-height:2;white-space:pre;
+  text-shadow:0 0 10px rgba(99,102,241,0.4);
 }
-.boot-cursor {
-  display:inline-block;width:10px;height:1.1em;
-  background:var(--green);
-  animation:blink 0.7s steps(1) infinite;
-  vertical-align:bottom;margin-right:4px;
+.boot-bar{
+  width:300px;height:2px;background:var(--bg3);border-radius:2px;margin-top:16px;overflow:hidden;
 }
-@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.boot-bar-fill{height:100%;background:var(--acc);animation:bootFill 1.8s ease forwards}
+@keyframes bootFill{from{width:0}to{width:100%}}
 
 /* ── DASHBOARD ──────────────────────────────────────────────────────────── */
-#dashboard {
-  display:none;
-  flex-direction:column;
-  min-height:100vh;
+#dashboard{
+  display:none;flex-direction:column;min-height:100vh;
   position:relative;z-index:1;
 }
 
-/* TOP BAR */
-.topbar {
-  padding:10px 20px;
-  border-bottom:1px solid var(--border);
-  background:var(--dark2);
-  display:flex;align-items:center;gap:14px;
-  flex-shrink:0;
+/* HEADER */
+.header{
+  height:56px;padding:0 20px;
+  background:rgba(10,11,15,0.9);
+  border-bottom:1px solid var(--b1);
+  backdrop-filter:blur(20px);
+  display:flex;align-items:center;gap:12px;
   position:sticky;top:0;z-index:50;
+  flex-shrink:0;
 }
-.tb-badge {
-  width:32px;height:32px;
-  border:1px solid var(--green);border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:1rem;
-  box-shadow:0 0 8px rgba(57,255,20,0.2);
+.hdr-avatar{
+  width:34px;height:34px;border-radius:50%;
+  background:linear-gradient(135deg,var(--acc),#7c3aed);
+  display:flex;align-items:center;justify-content:center;font-size:1rem;
+  box-shadow:0 0 10px rgba(99,102,241,0.3);flex-shrink:0;
 }
-.tb-name { font-size:0.9rem;color:var(--green);letter-spacing:0.08em; }
-.tb-rank { font-size:0.6rem;color:var(--dim);letter-spacing:0.15em;margin-top:1px; }
-.tb-id   { font-size:0.55rem;color:var(--dim);letter-spacing:0.1em; }
-.tb-right{ margin-right:auto;display:flex;align-items:center;gap:12px; }
-.logout-btn {
-  padding:4px 12px;background:transparent;border:1px solid var(--dim);
-  color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:0.65rem;
-  cursor:pointer;letter-spacing:0.1em;transition:all 0.2s;
+.hdr-name{font-size:0.88rem;font-weight:600;color:var(--text)}
+.hdr-rank{font-size:0.6rem;color:var(--dim);letter-spacing:0.08em;margin-top:1px}
+.hdr-id{font-size:0.55rem;color:var(--dim2);font-family:'DM Mono',monospace;letter-spacing:0.1em}
+.hdr-right{margin-right:auto;display:flex;align-items:center;gap:10px}
+.logout-btn{
+  padding:5px 12px;background:transparent;
+  border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--dim);font-size:0.68rem;cursor:pointer;
+  transition:all 0.18s;font-family:'Heebo',sans-serif;
 }
 .logout-btn:hover{border-color:var(--red);color:var(--red)}
+.verified-badge{
+  display:flex;align-items:center;gap:5px;
+  font-size:0.6rem;color:var(--green);
+  background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);
+  padding:3px 9px;border-radius:20px;
+}
+.verified-dot{width:5px;height:5px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 5px var(--green);animation:vPulse 2s ease-in-out infinite}
+@keyframes vPulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
-/* TOHU BANNER */
-.tohu-banner {
+/* TOHU BAR */
+#tohuBar{
   display:none;
   padding:8px 20px;
-  border-bottom:2px solid;
-  font-size:0.75rem;letter-spacing:0.3em;
+  font-size:0.72rem;letter-spacing:0.08em;
+  border-bottom:1px solid;
   text-align:center;
-  animation:tohuFlash 1s steps(1) infinite;
+  animation:tohuPulse 2s ease-in-out infinite;
 }
-@keyframes tohuFlash{0%,100%{opacity:1}50%{opacity:0.5}}
+@keyframes tohuPulse{0%,100%{opacity:1}50%{opacity:0.65}}
 
-/* LAYOUT */
-.dash-body {
-  flex:1;display:grid;
-  grid-template-columns:280px 1fr 260px;
-  gap:0;overflow:hidden;
-  max-height:calc(100vh - 54px);
+/* TAB NAV */
+.tab-nav{
+  display:flex;gap:2px;
+  padding:8px 16px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--b1);
+  overflow-x:auto;flex-shrink:0;
 }
-@media(max-width:900px){
-  .dash-body{grid-template-columns:1fr;max-height:none;overflow:auto}
+.tab-nav::-webkit-scrollbar{display:none}
+.tab-btn{
+  display:none;align-items:center;gap:7px;
+  padding:7px 14px;border-radius:var(--r2);
+  border:none;background:transparent;
+  color:var(--dim);font-family:'Heebo',sans-serif;font-size:0.78rem;
+  cursor:pointer;white-space:nowrap;transition:all 0.18s;
+  position:relative;
+}
+/* always visible tabs */
+#tabBank,#tabShop,#tabGizmed,#tabAlerts{display:flex}
+.tab-btn:hover{color:var(--text);background:var(--glass)}
+.tab-btn.active{color:var(--acc2);background:rgba(99,102,241,0.1)}
+.tab-btn.active::after{
+  content:'';position:absolute;bottom:-9px;right:0;left:0;
+  height:2px;background:var(--acc);border-radius:2px;
+}
+.tab-icon{font-size:0.9rem}
+.alert-badge{
+  display:none;width:16px;height:16px;
+  background:var(--red);border-radius:50%;
+  font-size:0.55rem;font-weight:700;color:#fff;
+  align-items:center;justify-content:center;
 }
 
-/* PANELS */
-.panel {
-  padding:16px;
-  border-left:1px solid var(--border);
-  overflow-y:auto;
-  background:var(--dark2);
-}
-.panel:first-child{border-left:none}
-.panel-title {
-  font-size:0.62rem;letter-spacing:0.25em;color:var(--dim);
-  margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:8px;
-}
-.panel-title::before{content:'//';color:var(--green);opacity:0.5}
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:20px;}
+.content::-webkit-scrollbar{width:4px}
+.content::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+.tab-pane{display:none}
 
-/* CARDS */
-.info-card {
-  border:1px solid var(--border);
-  background:var(--green-glow);
-  padding:14px 16px;
-  margin-bottom:12px;
+/* ── SHARED COMPONENTS ──────────────────────────────────────────────────── */
+.section-label{
+  font-size:0.65rem;font-weight:600;color:var(--dim);
+  letter-spacing:0.18em;text-transform:uppercase;margin-bottom:10px;
 }
-.info-card-label{font-size:0.58rem;letter-spacing:0.18em;color:var(--dim);margin-bottom:4px}
-.info-card-value{font-size:1rem;color:var(--green);text-shadow:0 0 8px rgba(57,255,20,0.4)}
-.info-card-value.salary{font-size:0.85rem}
+.ctrl-card{
+  background:var(--bg2);border:1px solid var(--b1);border-radius:var(--r);
+  padding:16px;margin-bottom:16px;
+}
+.ctrl-title{
+  font-size:0.72rem;font-weight:600;color:var(--acc2);
+  letter-spacing:0.1em;margin-bottom:12px;
+  display:flex;align-items:center;gap:6px;
+}
+.ctrl-title::before{content:'';width:3px;height:12px;background:var(--acc);border-radius:2px;flex-shrink:0}
+.ctrl-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.ctrl-col{display:flex;flex-direction:column;gap:8px}
 
-/* BUTTONS */
-.btn {
-  padding:8px 16px;background:transparent;
-  border:1px solid var(--green);color:var(--green);
-  font-family:'Share Tech Mono',monospace;font-size:0.72rem;
-  letter-spacing:0.08em;cursor:pointer;transition:all 0.18s;
+/* Inputs */
+.inp-text,.inp-select,.inp-textarea{
+  padding:8px 12px;
+  background:var(--bg3);border:1px solid var(--b1);border-radius:var(--r2);
+  color:var(--text);font-family:'Heebo',sans-serif;font-size:0.82rem;
+  direction:rtl;transition:border-color 0.18s;
 }
-.btn:hover{background:var(--green-dim);box-shadow:0 0 10px rgba(57,255,20,0.2)}
-.btn:disabled{opacity:0.3;cursor:not-allowed}
-.btn-sm{padding:4px 10px;font-size:0.65rem}
-.btn-activate{
-  width:100%;margin-top:12px;padding:10px;
-  border-color:#ff4400;color:#ff4400;letter-spacing:0.15em;
+.inp-text:focus,.inp-select:focus,.inp-textarea:focus{
+  outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(99,102,241,0.1);
 }
-.btn-activate:hover{background:rgba(255,68,0,0.1);box-shadow:0 0 12px rgba(255,68,0,0.3)}
-.btn-deactivate{
-  width:100%;padding:10px;margin-top:12px;
-  border-color:var(--dim);color:var(--dim);letter-spacing:0.12em;
-}
-.btn-deactivate:hover{border-color:var(--red);color:var(--red)}
-.btn-done{border-color:#39ff14;color:#39ff14}
-.btn-del{border-color:var(--red);color:var(--red)}
-.btn-add{width:100%;margin-top:10px;letter-spacing:0.1em}
+.inp-text::placeholder,.inp-textarea::placeholder{color:var(--dim2)}
+.inp-select option{background:var(--bg2)}
+.inp-textarea{resize:vertical;min-height:70px}
 
-/* INPUTS */
-.dash-input, .dash-select, .dash-textarea {
-  width:100%;padding:7px 10px;
-  background:var(--dark3);border:1px solid var(--border);
-  color:var(--green);font-family:'Share Tech Mono',monospace;font-size:0.78rem;
-  direction:rtl;transition:border-color 0.18s;margin-bottom:8px;
+/* Buttons */
+.btn{
+  padding:8px 16px;border-radius:var(--r2);
+  font-family:'Heebo',sans-serif;font-size:0.78rem;font-weight:600;
+  cursor:pointer;transition:all 0.18s;border:1px solid transparent;
+  letter-spacing:0.02em;
 }
-.dash-input:focus,.dash-select:focus,.dash-textarea:focus{
-  outline:none;border-color:var(--green);box-shadow:0 0 8px rgba(57,255,20,0.15);
+.btn:disabled{opacity:0.35;cursor:not-allowed}
+.btn-primary{background:var(--acc);color:#fff;border-color:var(--acc)}
+.btn-primary:hover{background:#4f46e5;box-shadow:0 4px 12px rgba(99,102,241,0.3)}
+.btn-accent{background:rgba(99,102,241,0.12);color:var(--acc2);border-color:rgba(99,102,241,0.25)}
+.btn-accent:hover{background:rgba(99,102,241,0.2)}
+.btn-danger{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-danger:hover{background:#dc2626;box-shadow:0 4px 12px rgba(239,68,68,0.3)}
+.btn-ghost{background:transparent;color:var(--dim);border-color:var(--b1)}
+.btn-ghost:hover{border-color:var(--b2);color:var(--text)}
+.btn-danger-h:hover{border-color:var(--red)!important;color:var(--red)!important}
+.btn-sm{padding:4px 10px;font-size:0.7rem}
+.btn-full{width:100%;margin-top:10px}
+.empty{
+  text-align:center;padding:32px;color:var(--dim2);
+  font-size:0.78rem;letter-spacing:0.05em;
 }
-.dash-input::placeholder,.dash-textarea::placeholder{color:var(--dim)}
-.dash-select option{background:var(--dark2);color:var(--green)}
-.dash-textarea{resize:vertical;min-height:60px}
 
-/* TOHU */
-.tohu-level-grid{
-  display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px;
+/* ── BANK ──────────────────────────────────────────────────────────────── */
+.bank-hero{
+  background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(79,70,229,0.06));
+  border:1px solid rgba(99,102,241,0.2);border-radius:var(--r);
+  padding:24px;margin-bottom:16px;
 }
-.tohu-level-card{
-  border:1px solid var(--tc,#39ff14);
-  padding:8px 4px;text-align:center;cursor:pointer;
-  transition:all 0.18s;
-  color:var(--tc,#39ff14);
+.bank-balance-label{font-size:0.62rem;color:var(--dim);letter-spacing:0.15em;margin-bottom:6px}
+.bank-balance{font-size:1.8rem;font-weight:700;color:var(--text);font-family:'DM Mono',monospace;line-height:1.2}
+.bank-salary-row{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--b1)}
+.bank-salary-label{font-size:0.62rem;color:var(--dim);letter-spacing:0.08em}
+.bank-salary-val{font-family:'DM Mono',monospace;font-size:0.82rem;color:var(--acc2)}
+.tx-section{margin-top:8px}
+.tx-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 0;border-bottom:1px solid var(--b1);
 }
-.tohu-level-card:hover,.tohu-level-card.selected{
-  background:rgba(from var(--tc) r g b / 0.15);
-  box-shadow:0 0 10px var(--tc);
-}
-.tlc-num{font-size:1.4rem;font-weight:700}
-.tlc-name{font-size:0.55rem;letter-spacing:0.05em;opacity:0.8;margin-top:2px}
-.tohu-desc-box{
-  border:1px solid var(--border);padding:10px;margin-bottom:10px;
-  font-size:0.75rem;min-height:60px;background:var(--green-glow);
-}
-.tohu-active-info{
-  border:1px solid;padding:12px;margin-bottom:10px;
-}
-.tohu-active-title{font-size:0.9rem;letter-spacing:0.1em;margin-bottom:6px;animation:tohuFlash 1s steps(1) infinite}
-.tohu-active-desc{font-size:0.72rem;opacity:0.8;line-height:1.6;margin-bottom:6px}
-.tohu-active-meta{font-size:0.6rem;opacity:0.5}
-.tohu-select-row{margin-bottom:8px}
+.tx-desc{font-size:0.8rem;color:var(--text)}
+.tx-date{font-size:0.62rem;color:var(--dim);margin-top:2px}
+.tx-amount{font-family:'DM Mono',monospace;font-size:0.85rem;font-weight:600}
+.tx-in{color:var(--green)}
+.tx-out{color:var(--red)}
 
-/* SALARY */
-.salary-row{
-  border-bottom:1px solid var(--border);
-  padding:10px 0;
+/* ── SHOP / GIZMED ──────────────────────────────────────────────────────── */
+.shop-section{margin-bottom:20px}
+.shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.item-card{
+  background:var(--bg2);border:1px solid var(--b1);border-radius:var(--r);
+  padding:14px;display:flex;flex-direction:column;align-items:center;
+  gap:6px;text-align:center;transition:border-color 0.18s;
 }
-.salary-agent{font-size:0.78rem;display:block;margin-bottom:6px}
-.salary-rank{color:var(--dim);font-size:0.65rem}
-.salary-edit-row{display:flex;gap:6px;align-items:center}
-.salary-input{
-  flex:1;padding:5px 8px;
-  background:var(--dark3);border:1px solid var(--border);
-  color:var(--green);font-family:'Share Tech Mono',monospace;font-size:0.72rem;
-  direction:rtl;transition:border-color 0.3s;
-}
-.salary-input:focus{outline:none;border-color:var(--green)}
+.item-card:hover{border-color:var(--acc)}
+.item-med:hover{border-color:var(--green)}
+.item-emoji{font-size:1.8rem}
+.item-name{font-size:0.8rem;font-weight:600;color:var(--text)}
+.item-desc{font-size:0.65rem;color:var(--dim);line-height:1.5}
+.item-price{font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--acc2);font-weight:600}
 
-/* TASKS */
+/* ── GIZMED HEADER ──────────────────────────────────────────────────────── */
+.gizmed-header{
+  display:flex;align-items:center;gap:14px;
+  background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);
+  border-radius:var(--r);padding:16px;margin-bottom:16px;
+}
+.gizmed-logo{font-size:2rem}
+.gizmed-title{font-size:1rem;font-weight:700;color:var(--text)}
+.gizmed-sub{font-size:0.65rem;color:var(--dim);margin-top:2px}
+
+/* ── ALERTS ──────────────────────────────────────────────────────────────── */
+.alert-card{
+  border-radius:var(--r);padding:12px 14px;margin-bottom:8px;
+  border:1px solid var(--b1);background:var(--bg2);
+}
+.al-info{border-right:3px solid var(--acc)}
+.al-warning{border-right:3px solid var(--yellow)}
+.al-critical{border-right:3px solid var(--red)}
+.al-read{opacity:0.45}
+.al-header{display:flex;justify-content:space-between;margin-bottom:7px}
+.al-from{font-size:0.72rem;font-weight:600;color:var(--text)}
+.al-date{font-size:0.6rem;color:var(--dim)}
+.al-msg{font-size:0.82rem;color:var(--text);line-height:1.6;margin-bottom:8px}
+
+/* ── TASKS ──────────────────────────────────────────────────────────────── */
+.tasks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 .task-card{
-  border:1px solid var(--border);
-  background:var(--green-glow);
-  padding:10px;margin-bottom:8px;
+  background:var(--bg2);border:1px solid var(--b1);
+  border-radius:var(--r);padding:12px;
+  display:flex;flex-direction:column;gap:6px;
   transition:border-color 0.18s;
 }
-.task-card:hover{border-color:rgba(57,255,20,0.4)}
-.task-card.task-done{opacity:0.45}
-.task-header{display:flex;justify-content:space-between;margin-bottom:6px}
-.task-priority{font-size:0.6rem;letter-spacing:0.05em}
-.task-id{font-size:0.55rem;color:var(--dim);font-family:'Share Tech Mono',monospace}
-.task-title{font-size:0.82rem;margin-bottom:4px;line-height:1.4}
-.task-desc{font-size:0.68rem;color:var(--dim);margin-bottom:6px;line-height:1.5}
-.task-footer{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.task-assignee{font-size:0.65rem;color:var(--dim)}
-.task-status{font-size:0.6rem}
-.s-done{color:#39ff14}
-.s-pending{color:var(--dim)}
-.s-in_progress{color:var(--yellow)}
-.task-actions{display:flex;gap:6px}
+.task-card:hover{border-color:var(--b2)}
+.tc-done{opacity:0.4}
+.tc-header{display:flex;justify-content:space-between;align-items:center}
+.tc-badge{padding:2px 7px;border-radius:4px;font-size:0.6rem;font-weight:700;font-family:'DM Mono',monospace}
+.tp-high{background:rgba(239,68,68,0.15);color:var(--red)}
+.tp-medium{background:rgba(234,179,8,0.12);color:var(--yellow)}
+.tp-low{background:rgba(34,197,94,0.12);color:var(--green)}
+.tc-id{font-size:0.55rem;color:var(--dim2);font-family:'DM Mono',monospace}
+.tc-title{font-size:0.82rem;font-weight:600;color:var(--text);line-height:1.4}
+.tc-desc{font-size:0.7rem;color:var(--dim);line-height:1.5}
+.tc-footer{display:flex;justify-content:space-between;align-items:center}
+.tc-ass{font-size:0.65rem;color:var(--dim)}
+.tc-status{font-size:0.62rem}
+.ts-done{color:var(--green)}
+.ts-pending{color:var(--dim2)}
+.ts-in_progress{color:var(--yellow)}
+.tc-actions{display:flex;gap:6px}
 
-/* PRIORITY */
-.p-high .task-priority,.p-high{color:var(--red)}
-.p-medium{color:var(--yellow)}
-.p-low{color:#39ff14}
-
-/* LOG */
-.sys-log{
-  border-top:1px solid var(--border);
-  background:var(--dark);
-  padding:8px 14px;
-  max-height:100px;overflow-y:auto;
-  flex-shrink:0;
+/* ── TOHU ──────────────────────────────────────────────────────────────── */
+.tohu-wrap{max-width:560px}
+.tohu-active-card{
+  border:1px solid;border-radius:var(--r);padding:20px;
+  display:flex;flex-direction:column;align-items:center;
+  text-align:center;gap:10px;margin-bottom:16px;
 }
-.log-line{font-size:0.62rem;color:var(--dim);line-height:1.8;letter-spacing:0.05em}
-.sys-log::-webkit-scrollbar{width:2px}
-.sys-log::-webkit-scrollbar-thumb{background:var(--border)}
+.ta-badge{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:#fff;flex-shrink:0}
+.ta-title{font-size:1.1rem;font-weight:700;letter-spacing:0.05em}
+.ta-desc{font-size:0.8rem;color:var(--dim);line-height:1.7}
+.ta-by{font-size:0.65rem;color:var(--dim2)}
+.tohu-idle{}
+.tohu-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;margin-top:10px}
+.tohu-card{
+  border:1px solid var(--tc,var(--b1));
+  border-radius:var(--r2);padding:12px 6px;
+  text-align:center;cursor:pointer;transition:all 0.18s;
+  color:var(--tc,var(--dim));
+}
+.tohu-card:hover,.tohu-card.tc-sel{
+  background:rgba(from var(--tc) r g b / 0.12);
+  box-shadow:0 0 12px var(--tc);
+}
+.tc-num{font-size:1.5rem;font-weight:700;font-family:'DM Mono',monospace}
+.tc-lname{font-size:0.55rem;letter-spacing:0.05em;margin-top:3px;opacity:0.85}
+.tohu-desc{
+  border:1px solid var(--b1);border-radius:var(--r2);
+  padding:12px;min-height:64px;
+  font-size:0.78rem;color:var(--dim);line-height:1.7;
+  margin-bottom:12px;background:var(--bg2);
+}
 
-.empty-msg{font-size:0.7rem;color:var(--dim);text-align:center;padding:20px;letter-spacing:0.1em}
-.section-gap{margin-bottom:14px}
-.scrollable{overflow-y:auto;max-height:calc(100vh - 120px);padding-right:2px}
-.scrollable::-webkit-scrollbar{width:2px}
-.scrollable::-webkit-scrollbar-thumb{background:var(--border)}
+/* ── COUNCIL ─────────────────────────────────────────────────────────────── */
+.council-header{
+  display:flex;align-items:center;gap:14px;
+  background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);
+  border-radius:var(--r);padding:16px;margin-bottom:16px;
+}
+.council-emblem{font-size:2rem}
+.council-title{font-size:1rem;font-weight:700;color:var(--text)}
+.council-sub{font-size:0.65rem;color:var(--dim);margin-top:2px}
+.council-body{font-size:0.84rem;color:var(--dim);line-height:1.8;background:var(--bg2);border:1px solid var(--b1);border-radius:var(--r);padding:16px}
+
+/* ── G-PASS ───────────────────────────────────────────────────────────────── */
+.gpass-header{
+  display:flex;align-items:center;gap:14px;
+  background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.2);
+  border-radius:var(--r);padding:16px;margin-bottom:16px;
+}
+.gpass-badge{
+  width:44px;height:44px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,#ca8a04,#92400e);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;font-weight:900;color:#fff;font-family:'DM Mono',monospace;
+  box-shadow:0 0 16px rgba(234,179,8,0.3);
+}
+.gpass-title{font-size:0.95rem;font-weight:700;color:var(--text)}
+.gpass-sub{font-size:0.65rem;color:var(--dim);margin-top:2px}
+.gpass-card{
+  background:linear-gradient(135deg,rgba(234,179,8,0.06),rgba(146,64,14,0.04));
+  border:1px solid rgba(234,179,8,0.2);border-radius:var(--r);
+  padding:14px;margin-bottom:8px;
+}
+.gpass-card-header{display:flex;justify-content:space-between;margin-bottom:8px}
+.gpass-card-id{font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--yellow);font-weight:600}
+.gpass-card-date{font-size:0.6rem;color:var(--dim)}
+.gpass-card-name{font-size:0.88rem;font-weight:600;color:var(--text);margin-bottom:4px}
+.gpass-card-ded{font-size:0.75rem;color:var(--dim);line-height:1.6;margin-bottom:10px}
+.gpass-card-footer{display:flex;justify-content:space-between;align-items:center}
+.gpass-seal{
+  font-size:0.62rem;color:var(--yellow);
+  background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.25);
+  padding:2px 8px;border-radius:12px;font-weight:600;
+}
+
+/* ── NOTIFY ──────────────────────────────────────────────────────────────── */
+.notify{
+  position:fixed;bottom:20px;left:50%;
+  transform:translateX(-50%) translateY(60px);
+  padding:9px 20px;border-radius:24px;
+  font-size:0.78rem;font-weight:500;
+  background:var(--bg2);border:1px solid var(--b1);
+  color:var(--text);z-index:9999;
+  transition:transform 0.28s cubic-bezier(0.34,1.56,0.64,1),opacity 0.28s;
+  opacity:0;white-space:nowrap;
+  box-shadow:0 8px 24px rgba(0,0,0,0.4);
+}
+.notify.show{transform:translateX(-50%) translateY(0);opacity:1}
+.n-success{border-color:var(--green);color:var(--green)}
+.n-error{border-color:var(--red);color:var(--red)}
+.n-info{border-color:var(--acc);color:var(--acc2)}
 </style>
 </head>
 <body>
 
-<!-- ── LOGIN SCREEN ─────────────────────────────────────────────────────── -->
-<div id="loginScreen">
-  <div class="login-box">
-    <div class="login-logo">
-      <div class="logo-badge">🦅</div>
-      <span class="org-name">GIZBALLAH</span>
-      <span class="org-sub">SECURE AGENT TERMINAL // V2.4</span>
+<!-- LOGIN -->
+<div id="loginWrap">
+  <div class="login-card">
+    <div class="login-emblem">
+      <div class="ring">🦅</div>
+      <div class="login-title">GIZBALLAH</div>
+      <div class="login-sub">SECURE AGENT PORTAL v3.1</div>
     </div>
-    <label class="field-label" for="agentIdInput">// הזן מספר סוכן</label>
-    <input type="text" id="agentIdInput" class="login-input" placeholder="00000" maxlength="10" autocomplete="off">
-    <button class="login-btn" id="loginBtn" onclick="doLogin()">[ כניסה למערכת ]</button>
-    <div class="login-error" id="loginError"></div>
+    <label class="login-label" for="loginId">// מספר סוכן</label>
+    <input type="text" id="loginId" class="login-inp" placeholder="00000" maxlength="10" autocomplete="off">
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">כניסה למערכת</button>
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-secure"><span class="lock-icon">🔒</span> AES-256 ENCRYPTED · BIOMETRIC VERIFIED</div>
   </div>
 </div>
 
-<!-- ── BOOT SCREEN ──────────────────────────────────────────────────────── -->
-<div id="bootScreen">
-  <div id="bootLog"></div>
-  <span class="boot-cursor"></span>
+<!-- BOOT -->
+<div id="bootWrap">
+  <div id="bootLines"></div>
+  <div class="boot-bar"><div class="boot-bar-fill"></div></div>
 </div>
 
-<!-- ── DASHBOARD ────────────────────────────────────────────────────────── -->
+<!-- DASHBOARD -->
 <div id="dashboard">
-
-  <!-- TOP BAR -->
-  <div class="topbar">
-    <div class="tb-badge" id="agentEmoji">🦅</div>
+  <div class="header">
+    <div class="hdr-avatar" id="hdrEmoji">🦅</div>
     <div>
-      <div class="tb-name" id="agentName"></div>
-      <div class="tb-rank" id="agentRank"></div>
-      <div class="tb-id">סוכן #<span id="agentId"></span></div>
+      <div class="hdr-name" id="hdrName"></div>
+      <div class="hdr-rank" id="hdrRank"></div>
+      <div class="hdr-id" id="hdrId"></div>
     </div>
-    <div class="tb-right">
-      <button class="logout-btn" onclick="logout()">[ יציאה ]</button>
+    <div class="hdr-right">
+      <div class="verified-badge"><span class="verified-dot"></span>VERIFIED</div>
+      <button class="logout-btn" onclick="logout()">יציאה</button>
     </div>
   </div>
 
-  <!-- TOHU BANNER -->
-  <div class="tohu-banner" id="tohuBanner"></div>
+  <div id="tohuBar"></div>
 
-  <!-- BODY -->
-  <div class="dash-body">
+  <div class="tab-nav">
+    <button class="tab-btn" id="tabBank"    data-tab="bank"    onclick="switchTab('bank')">   <span class="tab-icon">🏦</span>בנק</button>
+    <button class="tab-btn" id="tabShop"    data-tab="shop"    onclick="switchTab('shop')">   <span class="tab-icon">🛒</span>חנות</button>
+    <button class="tab-btn" id="tabGizmed"  data-tab="gizmed"  onclick="switchTab('gizmed')"> <span class="tab-icon">⚕️</span>גיזמדא</button>
+    <button class="tab-btn" id="tabAlerts"  data-tab="alerts"  onclick="switchTab('alerts')"> <span class="tab-icon">🔔</span>התראות<span class="alert-badge" id="alertBadge"></span></button>
+    <button class="tab-btn" id="tabTasks"   data-tab="tasks"   onclick="switchTab('tasks')">  <span class="tab-icon">📋</span>משימות</button>
+    <button class="tab-btn" id="tabTohu"    data-tab="tohu"    onclick="switchTab('tohu')">   <span class="tab-icon">⚠️</span>קוד תוהו</button>
+    <button class="tab-btn" id="tabCouncil" data-tab="council" onclick="switchTab('council')"><span class="tab-icon">🦅</span>מועצת הנץ</button>
+    <button class="tab-btn" id="tabGpass"   data-tab="gpass"   onclick="switchTab('gpass')">  <span class="tab-icon">🏅</span>G-PASS</button>
+  </div>
 
-    <!-- LEFT: Agent info + Tohu + Add Task -->
-    <div class="panel scrollable">
-
-      <!-- Salary card -->
-      <div class="panel-title">פרופיל סוכן</div>
-      <div class="info-card">
-        <div class="info-card-label">// משכורת חודשית</div>
-        <div class="info-card-value salary" id="salaryAmount">—</div>
-      </div>
-
-      <!-- TOHU PANEL (president only) -->
-      <div id="tohuPanel" style="display:none">
-        <div class="panel-title" style="margin-top:14px">קוד תוהו</div>
-        <div id="tohuControls"></div>
-      </div>
-
-      <!-- ADD TASK (president + alg) -->
-      <div id="addTaskPanel" style="display:none">
-        <div class="panel-title" style="margin-top:14px">הוסף משימה</div>
-        <input type="text" class="dash-input" id="taskTitle" placeholder="כותרת משימה">
-        <textarea class="dash-textarea" id="taskDesc" placeholder="תיאור (אופציונלי)"></textarea>
-        <select class="dash-select" id="taskAssignee">
-          <option value="">— בחר סוכן —</option>
-        </select>
-        <select class="dash-select" id="taskPriority">
-          <option value="high">🔴 עדיפות גבוהה</option>
-          <option value="medium" selected>🟡 עדיפות בינונית</option>
-          <option value="low">🟢 עדיפות נמוכה</option>
-        </select>
-        <button class="btn btn-add" onclick="addTask()">+ הוסף משימה</button>
-      </div>
-
-    </div>
-
-    <!-- CENTER: Tasks -->
-    <div class="panel scrollable">
-      <div class="panel-title">משימות</div>
-      <div id="tasksList">
-        <div class="empty-msg">// טוען...</div>
-      </div>
-    </div>
-
-    <!-- RIGHT: Salary management (president) -->
-    <div class="panel scrollable">
-      <div id="salaryMgmtPanel" style="display:none">
-        <div class="panel-title">ניהול משכורות</div>
-        <div id="salaryList"></div>
-      </div>
-      <div id="sysLogPanel">
-        <div class="panel-title" style="margin-top:4px">לוג מערכת</div>
-        <div class="sys-log" id="sysLog"></div>
-      </div>
-    </div>
-
+  <div class="content">
+    <div class="tab-pane" id="pane-bank">    <div id="bankContent"></div></div>
+    <div class="tab-pane" id="pane-shop">    <div id="shopContent"></div></div>
+    <div class="tab-pane" id="pane-gizmed">  <div id="gizmedContent"></div></div>
+    <div class="tab-pane" id="pane-alerts">  <div id="alertsContent"></div></div>
+    <div class="tab-pane" id="pane-tasks">   <div id="tasksContent"></div></div>
+    <div class="tab-pane" id="pane-tohu">    <div id="tohuContent"></div></div>
+    <div class="tab-pane" id="pane-council"> <div id="councilContent"></div></div>
+    <div class="tab-pane" id="pane-gpass">   <div id="gpassContent"></div></div>
   </div>
 </div>
 
+<div class="notify" id="notify"></div>
 </body>
 </html>
