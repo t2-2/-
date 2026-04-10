@@ -735,11 +735,11 @@ const db = getFirestore(app);
 
 const RANK_ORDER = ['RECRUIT','SAMZAK','MAZKAL','MAFAE','ALG','PRESIDENT'];
 const AGENTS = {
-  "00002":{ name:"הנץ השוקט",     codename:"הנץ השוקט",     rank:"נשיא",   rankCode:"PRESIDENT", baseSalary:4e15,   emoji:"👑" },
-  "62828":{ name:"היואל האימתני", codename:"היואל האימתני", rank:'אל"ג',   rankCode:"ALG",       baseSalary:2e15,   emoji:"⚔️" },
-  "67246":{ name:"לולי (המלקט)",  codename:"המלקט",          rank:'מפ"ע',   rankCode:"MAFAE",     baseSalary:1.4e15, emoji:"🔧" },
-  "83412":{ name:"דרורי",          codename:"דרורי",          rank:'מזכ"ל', rankCode:"MAZKAL",    baseSalary:6e11,   emoji:"📋" },
-  "74631":{ name:"יהלי מועלם",    codename:"יהלי מועלם",    rank:'סמז"כ', rankCode:"SAMZAK",    baseSalary:3e11,   emoji:"🎖️" },
+  "00002":{ name:"הנץ השוקט",     codename:"הנץ השוקט",     rank:"נשיא",   rankCode:"PRESIDENT", baseSalary:4e9,   emoji:"👑" },
+  "62828":{ name:"היואל האימתני", codename:"היואל האימתני", rank:'אל"ג',   rankCode:"ALG",       baseSalary:2e9,   emoji:"⚔️" },
+  "67246":{ name:"לולי (המלקט)",  codename:"המלקט",          rank:'מפ"ע',   rankCode:"MAFAE",     baseSalary:1.4e9, emoji:"🔧" },
+  "83412":{ name:"דרורי",          codename:"דרורי",          rank:'מזכ"ל', rankCode:"MAZKAL",    baseSalary:6e8,   emoji:"📋" },
+  "74631":{ name:"יהלי מועלם",    codename:"יהלי מועלם",    rank:'סמז"כ', rankCode:"SAMZAK",    baseSalary:3e8,   emoji:"🎖️" },
   "54768":{ name:"אדריאנה",        codename:"אדריאנה",        rank:"מגוייס", rankCode:"RECRUIT",   baseSalary:0,      emoji:"🔄" },
 };
 
@@ -786,9 +786,20 @@ let dispatchLog = [];
 // ── SEED ───────────────────────────────────────────────
 async function seed(id) {
   const ar = doc(db,'agents',id);
-  if(!(await getDoc(ar)).exists()) await setDoc(ar,{...AGENTS[id],agentId:id,salary:AGENTS[id].baseSalary});
+  const aSnap = await getDoc(ar);
+  if(!aSnap.exists()) await setDoc(ar,{...AGENTS[id],agentId:id,salary:AGENTS[id].baseSalary});
+  
   const br = doc(db,'banks',id);
-  if(!(await getDoc(br)).exists()) await setDoc(br,{balance:70e15,agentId:id});
+  const bSnap = await getDoc(br);
+  if(!bSnap.exists()) {
+    await setDoc(br,{balance:70e9,agentId:id}); // 70 Billion initially
+  } else {
+    // Migration constraint fix: Reset balances that exceeded limit
+    if(bSnap.data().balance >= 9e15) {
+       await updateDoc(br,{balance:70e9});
+       await updateDoc(ar,{salary:AGENTS[id].baseSalary});
+    }
+  }
   const tr = doc(db,'system','tohu');
   if(!(await getDoc(tr)).exists()) await setDoc(tr,{active:false,level:0,activatedBy:null,activatedAt:null});
 }
@@ -1454,12 +1465,9 @@ window.revokeGpass=async function(id){
    UTILS
 ════════════════════════════════════════════════════════ */
 function fmtBTC(n){
-  const v=Number(n);const a=Math.abs(v);const s=v<0?'-':'';
-  if(a>=1e15)return s+(a/1e15).toFixed(2)+' Q₿';
-  if(a>=1e12)return s+(a/1e12).toFixed(2)+' T₿';
-  if(a>=1e9) return s+(a/1e9).toFixed(2)+' B₿';
-  if(a>=1e6) return s+(a/1e6).toFixed(2)+' M₿';
-  return s+v.toLocaleString()+' ₿';
+  const v=Number(n);
+  const s=v<0?'-':'';
+  return s+Math.abs(v).toLocaleString('en-US')+' ₿';
 }
 function fmtDate(d){return d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
