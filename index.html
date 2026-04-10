@@ -651,7 +651,8 @@ body{
     <div class="tb-logo"><span class="tb-logo-icon">🦅</span>GizOS</div>
     <div class="tb-sep"></div>
     <div class="tb-clock" id="tbClock">00:00:00</div>
-    <div class="tb-right">
+    <div class="tb-right" style="gap:12px;">
+      <div id="tbBalance" style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--green);font-weight:600;direction:ltr;"></div>
       <div class="tohu-pill" id="tohuPill"></div>
       <div class="tb-agent">
         <div class="tb-avatar" id="tbAvatar"></div>
@@ -841,6 +842,12 @@ function startOS(){
     tohuState=snap.data();
     updateTohuPill();
     refreshWin('tohu');
+  }));
+
+  // Global Bank Balance subscription for topbar
+  subs.push(onSnapshot(doc(db,'banks',agent.agentId),snap=>{
+    const topBal = document.getElementById('tbBalance');
+    if(topBal) topBal.textContent = fmtBTC(snap.data()?.balance ?? 0);
   }));
 }
 
