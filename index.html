@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GizOS — Gizballah Secure Operating System</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- Firebase Compat (global window access) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════
    ROOT & RESET
@@ -725,18 +729,9 @@ body{
 
 <div class="toast" id="toast"></div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {
-  getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc,
-  addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, increment, where
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  getDatabase, ref as dbRef, set as dbSet, get as dbGet, push as dbPush,
-  update as dbUpdate, onValue, serverTimestamp as rtdbTS
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
-
-const app = initializeApp({
+<script>
+// Firebase Compat SDK - already loaded via CDN scripts
+firebase.initializeApp({
   apiKey:"AIzaSyDwqyVuef-pZT5WOpBgiH4xjB7WekLsDGc",
   authDomain:"falcon-d5f48.firebaseapp.com",
   projectId:"falcon-d5f48",
@@ -745,28 +740,30 @@ const app = initializeApp({
   appId:"1:958990827013:web:e14eaa25a96239cdb2a66c",
   databaseURL:"https://falcon-d5f48-default-rtdb.firebaseio.com"
 });
-const db   = getFirestore(app);
-const rtdb = getDatabase(app);
+const rtdb = firebase.database();
+
+// ── RTDB HELPERS (Firebase Compat SDK) ───────────────────────────────────────
+function dbRef(path){ return rtdb.ref(path); }
+
 
 // ── RTDB BANK HELPERS ───────────────────────────────────────────────────────
 async function rtdbGetBalance(agentId) {
-  const snap = await dbGet(dbRef(rtdb, \`banks/\${agentId}/balance\`));
+  const snap = await dbRef(`banks/${agentId}/balance`).get();
   return snap.exists() ? snap.val() : 0;
 }
 async function rtdbSetBalance(agentId, balance) {
-  await dbSet(dbRef(rtdb, \`banks/\${agentId}/balance\`), balance);
+  await dbRef(`banks/${agentId}/balance`).set(balance);
 }
 async function rtdbLogTx(agentId, amount, description) {
-  const txRef = dbPush(dbRef(rtdb, \`banks/\${agentId}/transactions\`));
-  await dbSet(txRef, { amount, description, createdAt: Date.now() });
+  await dbRef(`banks/${agentId}/transactions`).push({ amount, description, createdAt: Date.now() });
 }
 async function rtdbInitBank(agentId) {
-  const snap = await dbGet(dbRef(rtdb, \`banks/\${agentId}/balance\`));
+  const snap = await dbRef(`banks/${agentId}/balance`).get();
   if (!snap.exists()) {
-    await dbSet(dbRef(rtdb, \`banks/\${agentId}/balance\`), 70e15);
+    await dbRef(`banks/${agentId}/balance`).set(70e15);
   }
 }
-// charge via RTDB (atomic read-modify-write)
+
 async function charge(agentId, amount, description) {
   const bal = await rtdbGetBalance(agentId);
   await rtdbSetBalance(agentId, bal + amount);
@@ -846,12 +843,17 @@ let dispatchLog = [];
 
 // ── SEED ───────────────────────────────────────────────
 async function seed(id) {
-  const ar = doc(db,'agents',id);
-  if(!(await getDoc(ar)).exists()) await setDoc(ar,{...AGENTS[id],agentId:id,salary:AGENTS[id].baseSalary});
-  // bank lives in RTDB
+  // All data in RTDB
+  const agSnap = await dbRef(`agents/${id}`).get();
+  if (!agSnap.exists()) {
+    await dbRef(`agents/${id}`).set({...AGENTS[id], agentId:id, salary:AGENTS[id].baseSalary});
+  }
   await rtdbInitBank(id);
-  const tr = doc(db,'system','tohu');
-  if(!(await getDoc(tr)).exists()) await setDoc(tr,{active:false,level:0,activatedBy:null,activatedAt:null});
+  const tohuSnap = await dbRef('system/tohu').get();
+  if (!tohuSnap.exists()) {
+    await dbRef('system/tohu').set({active:false,level:0,activatedBy:null,activatedAt:null});
+  }
+  localStorage.setItem('gizos_last_agent', id);
 }
 
 // ── LOGIN ───────────────────────────────────────────────
@@ -859,13 +861,18 @@ window.doLogin = async function(){
   const id = document.getElementById('lcInp').value.trim();
   if(!AGENTS[id]){setErr('// גישה נדחית — מספר סוכן לא מזוהה');return;}
   await seed(id);
-  const s = await getDoc(doc(db,'agents',id));
-  agent = {...AGENTS[id],...s.data(),agentId:id};
+  const s = await dbRef(`agents/${id}`).get();
+  agent = {...AGENTS[id],...(s.val()||{}), agentId:id};
   await runBoot();
   startOS();
 };
 function setErr(m){const e=document.getElementById('lcErr');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3000);}
-document.getElementById('lcInp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('lcInp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+  // Auto-fill last agent
+  const last=localStorage.getItem('gizos_last_agent');
+  if(last) document.getElementById('lcInp').value=last;
+});
 
 async function runBoot(){
   const lines=[
@@ -898,12 +905,13 @@ function startOS(){
     document.getElementById('tbClock').textContent=new Date().toLocaleTimeString('he-IL');
   },1000);
 
-  // Tohu subscription
-  subs.push(onSnapshot(doc(db,'system','tohu'),snap=>{
-    tohuState=snap.data();
+  // Tohu subscription (RTDB live)
+  const tohuUnsub = dbRef('system/tohu').on('value', snap=>{
+    tohuState = snap.val() || {active:false,level:0};
     updateTohuPill();
     refreshWin('tohu');
-  }));
+  });
+  subs.push(()=>dbRef('system/tohu').off('value', tohuUnsub));
 }
 
 function updateTohuPill(){
@@ -920,7 +928,7 @@ function updateTohuPill(){
 }
 
 window.doLogout = function(){
-  subs.forEach(u=>u&&u()); subs=[];
+  subs.forEach(u=>{ if(typeof u==='function') u(); }); subs=[];
   agent=null; tohuState=null; dispatchLog=[];
   document.querySelectorAll('.window').forEach(w=>w.remove());
   document.getElementById('desktop').style.display='none';
@@ -1042,11 +1050,11 @@ async function loadWinContent(id){
 // ─────────────────────────────────────────────────────
 async function renderBank(el){
   const bal = await rtdbGetBalance(agent.agentId);
-  const aSnap = await getDoc(doc(db,'agents',agent.agentId));
-  const sal = aSnap.data()?.salary ?? agent.baseSalary;
+  const aSnap = await dbRef(`agents/${agent.agentId}/salary`).get();
+  const sal = aSnap.exists() ? aSnap.val() : (agent.salary ?? agent.baseSalary);
 
   // Live RTDB transactions
-  const txSnap = await dbGet(dbRef(rtdb, `banks/${agent.agentId}/transactions`));
+  const txSnap = await dbRef(`banks/${agent.agentId}/transactions`).get();
   const txs = [];
   if(txSnap.exists()){
     txSnap.forEach(child => txs.unshift({id:child.key,...child.val()}));
@@ -1113,7 +1121,7 @@ async function renderBank(el){
     </div>`;
 
   // Live balance listener
-  onValue(dbRef(rtdb,`banks/${agent.agentId}/balance`), snap=>{
+  dbRef(`banks/${agent.agentId}/balance`).on('value', snap=>{
     const el2=document.getElementById('liveBalance');
     if(el2) el2.textContent=fmtBTC(snap.val()??0);
   });
@@ -1146,14 +1154,14 @@ window.updateSal=async function(){
   const tgt=document.getElementById('bSalTarget').value;
   const amt=parseFloat(document.getElementById('bSalAmt').value);
   if(!tgt||isNaN(amt)){toast('ערך לא תקין','err');return;}
-  await updateDoc(doc(db,'agents',tgt),{salary:amt});
+  await dbRef(`agents/${tgt}/salary`).set(amt);
   toast('משכורת עודכנה','ok');
   refreshWin('bank');
 };
 window.payAll=async function(){
   for(const [id] of Object.entries(AGENTS)){
-    const s=await getDoc(doc(db,'agents',id));
-    const sal=s.data()?.salary??AGENTS[id].baseSalary;
+    const s=await dbRef(`agents/${id}/salary`).get();
+    const sal=s.exists()?s.val():AGENTS[id].baseSalary;
     if(sal>0) await charge(id,sal,'משכורת חודשית');
   }
   toast('משכורות שולמו לכולם','ok');
@@ -1299,12 +1307,11 @@ function renderAlerts(el){
     <div id="alertsList"><div class="empty">טוען...</div></div>`;
 
   // Live sub
-  const sub=onSnapshot(
-    query(collection(db,'alerts'),where('toId','==',agent.agentId),orderBy('createdAt','desc')),
-    snap=>{
+  const sub=dbRef(`alerts/${agent.agentId}`).on('value', snap=>{
       const list=document.getElementById('alertsList');
-      if(!list)return;
-      const alerts=snap.docs.map(d=>({id:d.id,...d.data()}));
+      if(!list){dbRef(`alerts/${agent.agentId}`).off('value',sub);return;}
+      const alerts=[];
+      if(snap.exists()) snap.forEach(ch=>{alerts.unshift({id:ch.key,...ch.val()});});
       list.innerHTML=alerts.length?alerts.map(a=>`
         <div class="alert-card al-${a.level||'info'} ${a.read?'al-read':''}">
           <div class="al-hdr">
@@ -1324,11 +1331,14 @@ window.sendAlert=async function(){
   const msg=document.getElementById('alMsg').value.trim();
   const lvl=document.getElementById('alLvl').value;
   if(!to||!msg){toast('מלא את כל השדות','err');return;}
-  await addDoc(collection(db,'alerts'),{toId:to,fromId:agent.agentId,message:msg,level:lvl,read:false,createdAt:serverTimestamp()});
+  await dbRef(`alerts/${to}`).push({fromId:agent.agentId,message:msg,level:lvl,read:false,createdAt:Date.now()});
   document.getElementById('alMsg').value='';
   toast('התראה נשלחה','ok');
 };
-window.markRead=async function(id){await updateDoc(doc(db,'alerts',id),{read:true});};
+window.markRead=async function(alertId){
+  // Find the alert in RTDB under recipient
+  await dbRef(`alerts/${agent.agentId}/${alertId}/read`).set(true);
+};
 
 // ─────────────────────────────────────────────────────
 // TASKS
@@ -1358,13 +1368,13 @@ async function renderTasks(el){
     <div class="sec-label">משימות</div>
     <div class="tasks-grid" id="taskGrid"><div class="empty">טוען...</div></div>`;
 
-  const q=isCommander
-    ?query(collection(db,'tasks'),orderBy('createdAt','desc'))
-    :query(collection(db,'tasks'),where('assigneeId','==',agent.agentId),orderBy('createdAt','desc'));
-
-  const sub=onSnapshot(q,snap=>{
-    const g=document.getElementById('taskGrid');if(!g)return;
-    const tasks=snap.docs.map(d=>({id:d.id,...d.data()}));
+  const tasksPath = 'tasks';
+  const sub=dbRef(tasksPath).on('value',snap=>{
+    const g=document.getElementById('taskGrid');
+    if(!g){dbRef(tasksPath).off('value',sub);return;}
+    const allTasks=[];
+    if(snap.exists()) snap.forEach(ch=>{allTasks.push({id:ch.key,...ch.val()});});
+    const tasks = isCommander ? allTasks.reverse() : allTasks.filter(t=>t.assigneeId===agent.agentId).reverse();
     g.innerHTML=tasks.length?tasks.map(t=>{
       const ass=AGENTS[t.assigneeId];const isMine=t.assigneeId===agent.agentId;
       return `<div class="task-card ${t.status==='done'?'tc-done':''}">
@@ -1385,7 +1395,7 @@ async function renderTasks(el){
       </div>`;
     }).join(''):'<div class="empty">אין משימות</div>';
   });
-  subs.push(sub);
+  subs.push(()=>dbRef(tasksPath).off('value',sub));
 }
 window.addTask=async function(){
   const title=document.getElementById('tTitle')?.value.trim();
@@ -1393,11 +1403,11 @@ window.addTask=async function(){
   const ass=document.getElementById('tAss')?.value;
   const pri=document.getElementById('tPri')?.value;
   if(!title||!ass){toast('נא למלא כותרת וסוכן','err');return;}
-  await addDoc(collection(db,'tasks'),{title,description:desc,assigneeId:ass,priority:pri,status:'pending',createdBy:agent.agentId,createdAt:serverTimestamp()});
+  await dbRef('tasks').push({title,description:desc||'',assigneeId:ass,priority:pri,status:'pending',createdBy:agent.agentId,createdAt:Date.now()});
   toast('משימה נוספה','ok');
 };
-window.doneTask=async id=>{await updateDoc(doc(db,'tasks',id),{status:'done'});toast('הושלמה ✓','ok');};
-window.delTask=async id=>{await deleteDoc(doc(db,'tasks',id));toast('נמחקה','info');};
+window.doneTask=async id=>{await dbRef(`tasks/${id}/status`).set('done');toast('הושלמה ✓','ok');};
+window.delTask=async id=>{await dbRef(`tasks/${id}`).remove();toast('נמחקה','info');};
 
 
 // ─────────────────────────────────────────────────────
@@ -1429,7 +1439,7 @@ async function renderDeploy(el) {
   const limitTxt = limit === Infinity ? 'ללא הגבלה' : fmtBTC(limit);
 
   // Load deploy history from RTDB
-  const histSnap = await dbGet(dbRef(rtdb, `deployments/${agent.agentId}`));
+  const histSnap = await dbRef(`deployments/${agent.agentId}`).get();
   const history = [];
   if (histSnap.exists()) {
     histSnap.forEach(child => history.unshift({ id: child.key, ...child.val() }));
@@ -1533,8 +1543,8 @@ window.executeDeploy = async function() {
   await charge(agent.agentId, -total, `שגר: ${unit.name} × ${count} → ${location}`);
 
   // Save to RTDB
-  const deployRef = dbPush(dbRef(rtdb, `deployments/${agent.agentId}`));
-  await dbSet(deployRef, {
+  const deployRef = dbRef(`deployments/${agent.agentId}`).push();
+  await deployRef.set({
     location, unitId, unitName: unit.name, unitEmoji: unit.emoji,
     count, totalCost: total, mission: mission || '', urgency,
     deployedBy: agent.codename, createdAt: Date.now()
@@ -1576,12 +1586,12 @@ function renderTohu(el){
 window.selectTohu=function(n){selTohu=n;renderTohu(document.getElementById('wb-tohu'));};
 window.activateTohu=async function(){
   if(!selTohu||!confirm(`אשר הפעלת קוד תוהו ${selTohu}?`))return;
-  await updateDoc(doc(db,'system','tohu'),{active:true,level:selTohu,activatedBy:agent.codename,activatedAt:serverTimestamp()});
+  await dbRef('system/tohu').set({active:true,level:selTohu,activatedBy:agent.codename,activatedAt:Date.now()});
   selTohu=null;toast(`תוהו ${selTohu||''} הופעל`,'warn');
 };
 window.deactivateTohu=async function(){
   if(!confirm('אשר כיבוי קוד תוהו?'))return;
-  await updateDoc(doc(db,'system','tohu'),{active:false,level:0,activatedBy:null,activatedAt:null});
+  await dbRef('system/tohu').set({active:false,level:0,activatedBy:null,activatedAt:null});
   toast('קוד תוהו כובה','info');
 };
 
@@ -1597,7 +1607,7 @@ async function renderDeploy(el){
   const myLimit   = TRANSFER_LIMITS[agent.rankCode] ?? 1_000_000;
 
   // Load existing deployments from RTDB
-  const depSnap = await dbGet(dbRef(rtdb,'deployments'));
+  const depSnap = await dbRef('deployments').get();
   const deps = [];
   if(depSnap.exists()){
     depSnap.forEach(child=>{
@@ -1694,8 +1704,8 @@ window.deployAgents=async function(){
     await charge(agent.agentId,-budget,'תקציב שגרה: '+mission+' ל-'+target);
   }
 
-  const depRef=dbPush(dbRef(rtdb,'deployments'));
-  await dbSet(depRef,{
+  const depRef=dbRef('deployments').push();
+  await depRef.set({
     target,location:location||'',teamSize,mission,budget:budget||0,
     notes:notes||'',deployedBy:agent.agentId,
     status:'active',createdAt:Date.now()
@@ -1733,8 +1743,9 @@ function renderCouncil(el){
 // G-PASS
 // ─────────────────────────────────────────────────────
 async function renderGpass(el){
-  const snap=await getDocs(query(collection(db,'gpasses'),orderBy('createdAt','desc')));
-  const passes=snap.docs.map(d=>({id:d.id,...d.data()}));
+  const snap=await dbRef('gpasses').get();
+  const passes=[];
+  if(snap.exists()) snap.forEach(ch=>passes.unshift({id:ch.key,...ch.val()}));
   el.innerHTML=`
     <div class="gpass-banner">
       <div class="gpass-g">G</div>
@@ -1770,13 +1781,13 @@ window.issueGpass=async function(){
   const name=document.getElementById('gpName')?.value.trim();
   const ded=document.getElementById('gpDed')?.value.trim();
   if(!name){toast('נא להזין שם','err');return;}
-  await addDoc(collection(db,'gpasses'),{recipientName:name,dedication:ded,issuedBy:agent.agentId,createdAt:serverTimestamp()});
+  await dbRef('gpasses').push({recipientName:name,dedication:ded,issuedBy:agent.agentId,createdAt:Date.now()});
   toast('G-PASS הונפק ✓','ok');
   renderGpass(document.getElementById('wb-gpass'));
 };
 window.revokeGpass=async function(id){
   if(!confirm('בטל פאס?'))return;
-  await deleteDoc(doc(db,'gpasses',id));
+  await dbRef(`gpasses/${id}`).remove();
   toast('פאס בוטל','info');
   renderGpass(document.getElementById('wb-gpass'));
 };
