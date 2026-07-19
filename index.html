@@ -651,8 +651,7 @@ body{
     <div class="tb-logo"><span class="tb-logo-icon">🦅</span>GizOS</div>
     <div class="tb-sep"></div>
     <div class="tb-clock" id="tbClock">00:00:00</div>
-    <div class="tb-right" style="gap:12px;">
-      <div id="tbBalance" style="font-family:'DM Mono',monospace;font-size:0.75rem;color:var(--green);font-weight:600;direction:ltr;"></div>
+    <div class="tb-right">
       <div class="tohu-pill" id="tohuPill"></div>
       <div class="tb-agent">
         <div class="tb-avatar" id="tbAvatar"></div>
@@ -684,6 +683,10 @@ body{
       <div class="di-ico di-tasks">📋</div>
       <div class="di-label">משימות</div>
     </div>
+    <div class="desk-icon" onclick="openApp('deploy')">
+      <div class="di-ico" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">🪖</div>
+      <div class="di-label">שגרת סוכנים</div>
+    </div>
     <div class="desk-icon" id="iconTohu"   style="display:none" onclick="openApp('tohu')">
       <div class="di-ico di-tohu">⚠️</div>
       <div class="di-label">קוד תוהו</div>
@@ -696,6 +699,10 @@ body{
       <div class="di-ico di-gpass">🏅</div>
       <div class="di-label">G-PASS</div>
     </div>
+    <div class="desk-icon" onclick="openApp('deploy')">
+      <div class="di-ico" style="background:linear-gradient(135deg,#1a2a1a,#15803d)">🪖</div>
+      <div class="di-label">שגרים</div>
+    </div>
   </div>
 
   <!-- DOCK -->
@@ -706,6 +713,8 @@ body{
     <div class="dock-item" onclick="openApp('alerts')">🔔<div class="dock-tooltip">התראות</div></div>
     <div class="dock-sep"></div>
     <div class="dock-item" onclick="openApp('tasks')">📋<div class="dock-tooltip">משימות</div></div>
+    <div class="dock-item" onclick="openApp('deploy')">🪖<div class="dock-tooltip">שגרים</div></div>
+    <div class="dock-item" onclick="openApp('deploy')">🪖<div class="dock-tooltip">שגרת סוכנים</div></div>
     <div class="dock-item" id="dockTohu"    style="display:none" onclick="openApp('tohu')">⚠️<div class="dock-tooltip">קוד תוהו</div></div>
     <div class="dock-item" id="dockCouncil" style="display:none" onclick="openApp('council')">🦅<div class="dock-tooltip">מועצת הנץ</div></div>
     <div class="dock-item" id="dockGpass"   style="display:none" onclick="openApp('gpass')">🏅<div class="dock-tooltip">G-PASS</div></div>
@@ -722,6 +731,10 @@ import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc,
   addDoc, query, orderBy, onSnapshot, serverTimestamp, deleteDoc, increment, where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getDatabase, ref as dbRef, set as dbSet, get as dbGet, push as dbPush,
+  update as dbUpdate, onValue, serverTimestamp as rtdbTS
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const app = initializeApp({
   apiKey:"AIzaSyDwqyVuef-pZT5WOpBgiH4xjB7WekLsDGc",
@@ -729,17 +742,65 @@ const app = initializeApp({
   projectId:"falcon-d5f48",
   storageBucket:"falcon-d5f48.firebasestorage.app",
   messagingSenderId:"958990827013",
-  appId:"1:958990827013:web:e14eaa25a96239cdb2a66c"
+  appId:"1:958990827013:web:e14eaa25a96239cdb2a66c",
+  databaseURL:"https://falcon-d5f48-default-rtdb.firebaseio.com"
 });
-const db = getFirestore(app);
+const db   = getFirestore(app);
+const rtdb = getDatabase(app);
+
+// ── RTDB BANK HELPERS ───────────────────────────────────────────────────────
+async function rtdbGetBalance(agentId) {
+  const snap = await dbGet(dbRef(rtdb, \`banks/\${agentId}/balance\`));
+  return snap.exists() ? snap.val() : 0;
+}
+async function rtdbSetBalance(agentId, balance) {
+  await dbSet(dbRef(rtdb, \`banks/\${agentId}/balance\`), balance);
+}
+async function rtdbLogTx(agentId, amount, description) {
+  const txRef = dbPush(dbRef(rtdb, \`banks/\${agentId}/transactions\`));
+  await dbSet(txRef, { amount, description, createdAt: Date.now() });
+}
+async function rtdbInitBank(agentId) {
+  const snap = await dbGet(dbRef(rtdb, \`banks/\${agentId}/balance\`));
+  if (!snap.exists()) {
+    await dbSet(dbRef(rtdb, \`banks/\${agentId}/balance\`), 70e15);
+  }
+}
+// charge via RTDB (atomic read-modify-write)
+async function charge(agentId, amount, description) {
+  const bal = await rtdbGetBalance(agentId);
+  await rtdbSetBalance(agentId, bal + amount);
+  await rtdbLogTx(agentId, amount, description);
+}
+// transfer between agents
+async function transfer(fromId, toId, amount, desc) {
+  const fromBal = await rtdbGetBalance(fromId);
+  if (fromBal < amount) throw new Error("יתרה לא מספקת");
+  await rtdbSetBalance(fromId, fromBal - amount);
+  await rtdbLogTx(fromId, -amount, \`העברה אל \${AGENTS[toId]?.codename}: \${desc}\`);
+  const toBal = await rtdbGetBalance(toId);
+  await rtdbSetBalance(toId, toBal + amount);
+  await rtdbLogTx(toId, amount, \`קיבל מ-\${AGENTS[fromId]?.codename}: \${desc}\`);
+}
+
+// ── RANK TRANSFER LIMITS ─────────────────────────────────────────────────────
+// RECRUIT=1M, SAMZAK=2M, MAZKAL=4M, MAFAE=8M, ALG=16M, PRESIDENT=unlimited
+const TRANSFER_LIMITS = {
+  RECRUIT:  1_000_000,
+  SAMZAK:   2_000_000,
+  MAZKAL:   4_000_000,
+  MAFAE:    8_000_000,
+  ALG:      16_000_000,
+  PRESIDENT: Infinity,
+};
 
 const RANK_ORDER = ['RECRUIT','SAMZAK','MAZKAL','MAFAE','ALG','PRESIDENT'];
 const AGENTS = {
-  "00002":{ name:"הנץ השוקט",     codename:"הנץ השוקט",     rank:"נשיא",   rankCode:"PRESIDENT", baseSalary:4e9,   emoji:"👑" },
-  "62828":{ name:"היואל האימתני", codename:"היואל האימתני", rank:'אל"ג',   rankCode:"ALG",       baseSalary:2e9,   emoji:"⚔️" },
-  "67246":{ name:"לולי (המלקט)",  codename:"המלקט",          rank:'מפ"ע',   rankCode:"MAFAE",     baseSalary:1.4e9, emoji:"🔧" },
-  "83412":{ name:"דרורי",          codename:"דרורי",          rank:'מזכ"ל', rankCode:"MAZKAL",    baseSalary:6e8,   emoji:"📋" },
-  "74631":{ name:"יהלי מועלם",    codename:"יהלי מועלם",    rank:'סמז"כ', rankCode:"SAMZAK",    baseSalary:3e8,   emoji:"🎖️" },
+  "00002":{ name:"הנץ השוקט",     codename:"הנץ השוקט",     rank:"נשיא",   rankCode:"PRESIDENT", baseSalary:4e15,   emoji:"👑" },
+  "62828":{ name:"היואל האימתני", codename:"היואל האימתני", rank:'אל"ג',   rankCode:"ALG",       baseSalary:2e15,   emoji:"⚔️" },
+  "67246":{ name:"לולי (המלקט)",  codename:"המלקט",          rank:'מפ"ע',   rankCode:"MAFAE",     baseSalary:1.4e15, emoji:"🔧" },
+  "83412":{ name:"דרורי",          codename:"דרורי",          rank:'מזכ"ל', rankCode:"MAZKAL",    baseSalary:6e11,   emoji:"📋" },
+  "74631":{ name:"יהלי מועלם",    codename:"יהלי מועלם",    rank:'סמז"כ', rankCode:"SAMZAK",    baseSalary:3e11,   emoji:"🎖️" },
   "54768":{ name:"אדריאנה",        codename:"אדריאנה",        rank:"מגוייס", rankCode:"RECRUIT",   baseSalary:0,      emoji:"🔄" },
 };
 
@@ -786,20 +847,9 @@ let dispatchLog = [];
 // ── SEED ───────────────────────────────────────────────
 async function seed(id) {
   const ar = doc(db,'agents',id);
-  const aSnap = await getDoc(ar);
-  if(!aSnap.exists()) await setDoc(ar,{...AGENTS[id],agentId:id,salary:AGENTS[id].baseSalary});
-  
-  const br = doc(db,'banks',id);
-  const bSnap = await getDoc(br);
-  if(!bSnap.exists()) {
-    await setDoc(br,{balance:70e9,agentId:id}); // 70 Billion initially
-  } else {
-    // Migration constraint fix: Reset balances that exceeded limit
-    if(bSnap.data().balance >= 9e15) {
-       await updateDoc(br,{balance:70e9});
-       await updateDoc(ar,{salary:AGENTS[id].baseSalary});
-    }
-  }
+  if(!(await getDoc(ar)).exists()) await setDoc(ar,{...AGENTS[id],agentId:id,salary:AGENTS[id].baseSalary});
+  // bank lives in RTDB
+  await rtdbInitBank(id);
   const tr = doc(db,'system','tohu');
   if(!(await getDoc(tr)).exists()) await setDoc(tr,{active:false,level:0,activatedBy:null,activatedAt:null});
 }
@@ -854,12 +904,6 @@ function startOS(){
     updateTohuPill();
     refreshWin('tohu');
   }));
-
-  // Global Bank Balance subscription for topbar
-  subs.push(onSnapshot(doc(db,'banks',agent.agentId),snap=>{
-    const topBal = document.getElementById('tbBalance');
-    if(topBal) topBal.textContent = fmtBTC(snap.data()?.balance ?? 0);
-  }));
 }
 
 function updateTohuPill(){
@@ -895,7 +939,9 @@ const WIN_DEFS = {
   tasks:  {title:'משימות',         icon:'📋', w:560, h:500},
   tohu:   {title:'קוד תוהו',       icon:'⚠️', w:440, h:460},
   council:{title:'מועצת הנץ',     icon:'🦅', w:400, h:320},
+  deploy: {title:'שגרת סוכנים לתקיפה', icon:'🪖', w:540, h:580},
   gpass:  {title:'G-PASS',         icon:'🏅', w:460, h:520},
+  deploy: {title:'מרכז שגרים',      icon:'🪖', w:560, h:580},
 };
 
 const openWins = {};
@@ -986,131 +1032,138 @@ async function loadWinContent(id){
   if(id==='tasks')   await renderTasks(el);
   if(id==='tohu')    renderTohu(el);
   if(id==='council') renderCouncil(el);
+  if(id==='deploy')  renderDeploy(el);
   if(id==='gpass')   await renderGpass(el);
+  if(id==='deploy')  await renderDeploy(el);
 }
 
-/* ════════════════════════════════════════════════════════
-   BANK APP
-════════════════════════════════════════════════════════ */
-async function renderBank(el) {
-  const isPresident = agent.rankCode === 'PRESIDENT';
-  const agentOpts = Object.entries(AGENTS).map(([id, a]) => `<option value="${id}">${a.emoji} ${a.codename}</option>`).join('');
+// ─────────────────────────────────────────────────────
+// BANK
+// ─────────────────────────────────────────────────────
+async function renderBank(el){
+  const bal = await rtdbGetBalance(agent.agentId);
+  const aSnap = await getDoc(doc(db,'agents',agent.agentId));
+  const sal = aSnap.data()?.salary ?? agent.baseSalary;
 
-  el.innerHTML = `
+  // Live RTDB transactions
+  const txSnap = await dbGet(dbRef(rtdb, `banks/${agent.agentId}/transactions`));
+  const txs = [];
+  if(txSnap.exists()){
+    txSnap.forEach(child => txs.unshift({id:child.key,...child.val()}));
+  }
+
+  const agentOpts = Object.entries(AGENTS).map(([id,a])=>`<option value="${id}">${a.emoji} ${a.codename}</option>`).join('');
+  const otherOpts = Object.entries(AGENTS).filter(([id])=>id!==agent.agentId)
+    .map(([id,a])=>`<option value="${id}">${a.emoji} ${a.codename}</option>`).join('');
+  const limit = TRANSFER_LIMITS[agent.rankCode] ?? 1_000_000;
+  const limitTxt = limit===Infinity ? 'ללא הגבלה' : fmtBTC(limit);
+
+  el.innerHTML=`
     <div class="bank-hero">
-      <div class="bh-label">יתרת חשבון</div>
-      <div class="bh-balance" id="bankBalDisplay">טוען...</div>
+      <div class="bh-label">יתרת חשבון — RTDB LIVE</div>
+      <div class="bh-balance" id="liveBalance">${fmtBTC(bal)}</div>
       <div class="bh-salary">
         <span class="bhs-label">משכורת חודשית:</span>
-        <span class="bhs-val" id="bankSalDisplay">טוען...</span>
+        <span class="bhs-val">${fmtBTC(sal)}</span>
+        <span class="bhs-label" style="margin-right:12px">מגבלת העברה:</span>
+        <span class="bhs-val" style="color:var(--yellow)">${limitTxt}</span>
       </div>
     </div>
-    ${isPresident ? `
+
     <div class="card">
-      <div class="card-title">ניהול פיננסי</div>
+      <div class="card-title">💸 העבר כסף לסוכן</div>
       <div class="col">
         <div class="row">
-          <select class="sel" id="bFinTarget" style="flex:1"><option value="">— בחר סוכן להעברה/קנס —</option>${agentOpts}</select>
-          <input type="number" class="inp" id="bFinAmt" placeholder="סכום" style="flex:1">
+          <select class="sel" id="trTarget" style="flex:1"><option value="">— בחר נמען —</option>${otherOpts}</select>
+          <input type="number" class="inp" id="trAmount" placeholder="סכום" style="flex:1" max="${limit===Infinity?'':limit}">
+        </div>
+        <input type="text" class="inp inp-full" id="trDesc" placeholder="מטרת ההעברה...">
+        <button class="btn btn-pri" onclick="doTransfer()">העבר</button>
+      </div>
+    </div>
+
+    ${agent.rankCode==='PRESIDENT'?`
+    <div class="card">
+      <div class="card-title">ניהול פיננסי — נשיא</div>
+      <div class="col">
+        <div class="row">
+          <select class="sel" id="bFineTarget" style="flex:1">${agentOpts}</select>
+          <input type="number" class="inp" id="bFineAmt" placeholder="סכום קנס" style="flex:1">
+          <button class="btn btn-danger btn-sm" onclick="applyFine()">קנס</button>
         </div>
         <div class="row">
-          <button class="btn btn-green" style="flex:1" onclick="applyBonus()">+ בונוס</button>
-          <button class="btn btn-danger" style="flex:1" onclick="applyFine()">- קנס</button>
-        </div>
-        <div class="row" style="margin-top:8px;padding-top:10px;border-top:1px solid var(--b1)">
-          <select class="sel" id="bSalTarget" style="flex:1"><option value="">— בחר סוכן לעדכון תעריף —</option>${agentOpts}</select>
+          <select class="sel" id="bSalTarget" style="flex:1">${agentOpts}</select>
           <input type="number" class="inp" id="bSalAmt" placeholder="משכורת חדשה" style="flex:1">
-          <button class="btn btn-pri btn-sm" onclick="updateSal()">עדכן משכורת</button>
+          <button class="btn btn-pri btn-sm" onclick="updateSal()">עדכן</button>
         </div>
         <button class="btn btn-sec btn-full" onclick="payAll()">💰 שלם משכורות לכולם</button>
       </div>
-    </div>` : ''}
-    <div class="sec-label" style="margin-top:8px">עובר ושב</div>
-    <div class="tx-list" id="bankTxList">
-      <div class="empty">טוען נתונים...</div>
-    </div>
-  `;
+    </div>`:''}
 
-  // ניקוי האזנות קודמות כדי למנוע כפילויות בפתיחה מחדש של החלון
-  if (window.bankUnsubs) window.bankUnsubs.forEach(u => u());
-  
-  window.bankUnsubs = [
-    // האזנה ליתרה בזמן אמת
-    onSnapshot(doc(db, 'banks', agent.agentId), snap => {
-      const bal = snap.data()?.balance ?? 0;
-      const elBal = document.getElementById('bankBalDisplay');
-      if (elBal) elBal.textContent = fmtBTC(bal);
-    }),
-    // האזנה למשכורת אישית בזמן אמת
-    onSnapshot(doc(db, 'agents', agent.agentId), snap => {
-      const sal = snap.data()?.salary ?? agent.baseSalary;
-      const elSal = document.getElementById('bankSalDisplay');
-      if (elSal) elSal.textContent = fmtBTC(sal);
-    }),
-    // האזנה לפעולות עו"ש בזמן אמת
-    onSnapshot(query(collection(db, 'banks', agent.agentId, 'transactions'), orderBy('createdAt', 'desc')), snap => {
-      const txs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const lEl = document.getElementById('bankTxList');
-      if (lEl) {
-        lEl.innerHTML = txs.length ? txs.slice(0, 30).map(t => `
-          <div class="tx-row">
-            <div class="tx-info">
-              <div class="tx-d">${esc(t.description || '')}</div>
-              <div class="tx-t">${t.createdAt ? fmtDate(t.createdAt.toDate()) : '—'}</div>
-            </div>
-            <div class="tx-amt ${t.amount >= 0 ? 'tx-in' : 'tx-out'}">${t.amount >= 0 ? '+' : ''}${fmtBTC(t.amount)}</div>
-          </div>`).join('') : '<div class="empty">אין פעולות</div>';
-      }
-    })
-  ];
+    <div class="sec-label" style="margin-top:8px">עובר ושב (RTDB)</div>
+    <div class="tx-list">
+      ${txs.length?txs.slice(0,40).map(t=>`
+        <div class="tx-row">
+          <div class="tx-info">
+            <div class="tx-d">${esc(t.description||'')}</div>
+            <div class="tx-t">${t.createdAt?fmtDate(new Date(t.createdAt)):'—'}</div>
+          </div>
+          <div class="tx-amt ${t.amount>=0?'tx-in':'tx-out'}">${t.amount>=0?'+':''}${fmtBTC(t.amount)}</div>
+        </div>`).join(''):'<div class="empty">אין פעולות</div>'}
+    </div>`;
 
-  subs.push(...window.bankUnsubs);
+  // Live balance listener
+  onValue(dbRef(rtdb,`banks/${agent.agentId}/balance`), snap=>{
+    const el2=document.getElementById('liveBalance');
+    if(el2) el2.textContent=fmtBTC(snap.val()??0);
+  });
 }
 
-window.applyFine = async function() {
-  const tgt = document.getElementById('bFinTarget').value;
-  const amt = parseFloat(document.getElementById('bFinAmt').value);
-  if (!tgt || isNaN(amt) || amt <= 0) { toast('ערך לא תקין', 'err'); return; }
-  await charge(tgt, -amt, `קנס מהנשיא`);
-  toast(`קנס הופחת מ-${AGENTS[tgt].codename}`, 'ok');
-  document.getElementById('bFinAmt').value = '';
+window.doTransfer = async function(){
+  const to  = document.getElementById('trTarget').value;
+  const amt = parseFloat(document.getElementById('trAmount').value);
+  const desc= document.getElementById('trDesc').value.trim()||'העברה';
+  if(!to){toast('בחר נמען','err');return;}
+  if(isNaN(amt)||amt<=0){toast('סכום לא תקין','err');return;}
+  const limit = TRANSFER_LIMITS[agent.rankCode]??1_000_000;
+  if(amt>limit){toast(`חריגה ממגבלת דרגה: ${fmtBTC(limit)}`,'err');return;}
+  try{
+    await transfer(agent.agentId,to,amt,desc);
+    toast(`הועבר ${fmtBTC(amt)} אל ${AGENTS[to]?.codename}`,'ok');
+    refreshWin('bank');
+  }catch(e){toast(e.message,'err');}
 };
 
-window.applyBonus = async function() {
-  const tgt = document.getElementById('bFinTarget').value;
-  const amt = parseFloat(document.getElementById('bFinAmt').value);
-  if (!tgt || isNaN(amt) || amt <= 0) { toast('ערך לא תקין', 'err'); return; }
-  await charge(tgt, amt, `בונוס מהנשיא`);
-  toast(`בונוס הועבר ל-${AGENTS[tgt].codename}`, 'ok');
-  document.getElementById('bFinAmt').value = '';
+window.applyFine=async function(){
+  const tgt=document.getElementById('bFineTarget').value;
+  const amt=parseFloat(document.getElementById('bFineAmt').value);
+  if(!tgt||isNaN(amt)||amt<=0){toast('ערך לא תקין','err');return;}
+  await charge(tgt,-amt,'קנס מהנשיא');
+  toast('קנס הופחת מ-'+AGENTS[tgt].codename,'ok');
+  refreshWin('bank');
 };
-
-window.updateSal = async function() {
-  const tgt = document.getElementById('bSalTarget').value;
-  const amt = parseFloat(document.getElementById('bSalAmt').value);
-  if (!tgt || isNaN(amt)) { toast('ערך לא תקין', 'err'); return; }
-  await updateDoc(doc(db, 'agents', tgt), { salary: amt });
-  toast(`משכורת חודשית בסיסית עודכנה`, 'ok');
-  document.getElementById('bSalAmt').value = '';
+window.updateSal=async function(){
+  const tgt=document.getElementById('bSalTarget').value;
+  const amt=parseFloat(document.getElementById('bSalAmt').value);
+  if(!tgt||isNaN(amt)){toast('ערך לא תקין','err');return;}
+  await updateDoc(doc(db,'agents',tgt),{salary:amt});
+  toast('משכורת עודכנה','ok');
+  refreshWin('bank');
 };
-
-window.payAll = async function() {
-  for (const [id] of Object.entries(AGENTS)) {
-    const s = await getDoc(doc(db, 'agents', id));
-    const sal = s.data()?.salary ?? AGENTS[id].baseSalary;
-    if (sal > 0) await charge(id, sal, 'משכורת חודשית');
+window.payAll=async function(){
+  for(const [id] of Object.entries(AGENTS)){
+    const s=await getDoc(doc(db,'agents',id));
+    const sal=s.data()?.salary??AGENTS[id].baseSalary;
+    if(sal>0) await charge(id,sal,'משכורת חודשית');
   }
-  toast('משכורות שולמו לכלל הסוכנים', 'ok');
+  toast('משכורות שולמו לכולם','ok');
+  refreshWin('bank');
 };
+// charge() is now defined above near RTDB helpers
 
-async function charge(aid, amount, desc) {
-  await updateDoc(doc(db, 'banks', aid), { balance: increment(amount) });
-  await addDoc(collection(db, 'banks', aid, 'transactions'), { amount, description: desc, createdAt: serverTimestamp() });
-}
-
-/* ════════════════════════════════════════════════════════
-   SHOP APP
-════════════════════════════════════════════════════════ */
+// ─────────────────────────────────────────────────────
+// SHOP
+// ─────────────────────────────────────────────────────
 function renderShop(el){
   const items=shopTab==='weapons'?SHOP_WEAPONS:SHOP_TACTICAL;
   el.innerHTML=`
@@ -1130,17 +1183,17 @@ function renderShop(el){
     </div>`;
 }
 window.setShopTab=function(tab){shopTab=tab;renderShop(document.getElementById('wb-shop'));};
-
 window.buyItem=async function(id,name,price){
-  const b=await getDoc(doc(db,'banks',agent.agentId));
-  if((b.data()?.balance??0)<price){toast('יתרה לא מספקת','err');return;}
-  await charge(agent.agentId,-price,`רכישה: ${name}`);
-  toast(`${name} נרכש ✓`,'ok');
+  const bal=await rtdbGetBalance(agent.agentId);
+  if(bal<price){toast('יתרה לא מספקת','err');return;}
+  await charge(agent.agentId,-price,'רכישה: '+name);
+  toast(name+' נרכש ✓','ok');
+  refreshWin('bank');
 };
 
-/* ════════════════════════════════════════════════════════
-   GIZMED APP - EMERGENCY DISPATCH
-════════════════════════════════════════════════════════ */
+// ─────────────────────────────────────────────────────
+// GIZMED
+// ─────────────────────────────────────────────────────
 function renderGizmed(el){
   el.innerHTML=`
     <div class="gizmed-header">
@@ -1218,9 +1271,9 @@ window.dispatch=function(icon,name,eta,status){
   renderGizmed(document.getElementById('wb-gizmed'));
 };
 
-/* ════════════════════════════════════════════════════════
-   ALERTS APP
-════════════════════════════════════════════════════════ */
+// ─────────────────────────────────────────────────────
+// ALERTS
+// ─────────────────────────────────────────────────────
 function renderAlerts(el){
   const myRankIdx=RANK_ORDER.indexOf(agent.rankCode);
   const targets=Object.entries(AGENTS).filter(([id,a])=>
@@ -1277,9 +1330,9 @@ window.sendAlert=async function(){
 };
 window.markRead=async function(id){await updateDoc(doc(db,'alerts',id),{read:true});};
 
-/* ════════════════════════════════════════════════════════
-   TASKS APP
-════════════════════════════════════════════════════════ */
+// ─────────────────────────────────────────────────────
+// TASKS
+// ─────────────────────────────────────────────────────
 async function renderTasks(el){
   const isCommander=RANK_ORDER.indexOf(agent.rankCode)>=RANK_ORDER.indexOf('ALG');
   const agentOpts=Object.entries(AGENTS).map(([id,a])=>`<option value="${id}">${a.emoji} ${a.codename}</option>`).join('');
@@ -1346,9 +1399,155 @@ window.addTask=async function(){
 window.doneTask=async id=>{await updateDoc(doc(db,'tasks',id),{status:'done'});toast('הושלמה ✓','ok');};
 window.delTask=async id=>{await deleteDoc(doc(db,'tasks',id));toast('נמחקה','info');};
 
-/* ════════════════════════════════════════════════════════
-   TOHU APP
-════════════════════════════════════════════════════════ */
+
+// ─────────────────────────────────────────────────────
+// DEPLOY — שגרים
+// ─────────────────────────────────────────────────────
+// מגבלות שגרים לפי דרגה (כפול 2 בכל דרגה, בסיס RECRUIT=1M)
+const DEPLOY_LIMITS = {
+  RECRUIT:  1_000_000,
+  SAMZAK:   2_000_000,
+  MAZKAL:   4_000_000,
+  MAFAE:    8_000_000,
+  ALG:      16_000_000,
+  PRESIDENT:Infinity,
+};
+
+const UNIT_TYPES = [
+  {id:'infantry',  name:'חי"ר',           emoji:'🪖', costPerUnit:5000,   desc:'חיילי רגלים'},
+  {id:'sniper',    name:'צלפים',           emoji:'🎯', costPerUnit:15000,  desc:'יחידת צלפים מיומנת'},
+  {id:'armor',     name:'שריון',           emoji:'🚛', costPerUnit:80000,  desc:'רכב קרבי'},
+  {id:'drone',     name:'רחפנים',          emoji:'🚁', costPerUnit:25000,  desc:'מל"ט קרבי'},
+  {id:'explosive', name:'חבלה',           emoji:'💣', costPerUnit:12000,  desc:'יחידת חבלה'},
+  {id:'intel',     name:'מודיעין',         emoji:'🕵️', costPerUnit:20000,  desc:'סוכנות שטח'},
+  {id:'heli',      name:'מסוקי קרב',      emoji:'🚀', costPerUnit:150000, desc:'תמיכה אווירית'},
+  {id:'cyber',     name:'סייבר',           emoji:'💻', costPerUnit:35000,  desc:'תקיפה קיברנטית'},
+];
+
+async function renderDeploy(el) {
+  const limit = DEPLOY_LIMITS[agent.rankCode] ?? 1_000_000;
+  const limitTxt = limit === Infinity ? 'ללא הגבלה' : fmtBTC(limit);
+
+  // Load deploy history from RTDB
+  const histSnap = await dbGet(dbRef(rtdb, `deployments/${agent.agentId}`));
+  const history = [];
+  if (histSnap.exists()) {
+    histSnap.forEach(child => history.unshift({ id: child.key, ...child.val() }));
+  }
+
+  const unitOpts = UNIT_TYPES.map(u =>
+    `<option value="${u.id}" data-cost="${u.costPerUnit}">${u.emoji} ${u.name} (${fmtBTC(u.costPerUnit)}/יחידה)</option>`
+  ).join('');
+
+  el.innerHTML = `
+    <div class="card" style="background:linear-gradient(135deg,rgba(21,128,61,0.1),rgba(22,101,52,0.06));border-color:rgba(34,197,94,0.2)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#15803d,#166534);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🪖</div>
+        <div>
+          <div style="font-size:0.88rem;font-weight:700;color:var(--text)">מרכז שגרים — גיזבאללה</div>
+          <div style="font-size:0.62rem;color:var(--dim)">מגבלת שגר: <span style="color:var(--yellow);font-weight:600">${limitTxt}</span> לפי דרגה ${agent.rank}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🚀 שגר כוח לאזור</div>
+      <div class="col">
+        <input type="text" class="inp inp-full" id="dpLocation" placeholder="יעד / מיקום (מדינה, עיר, קואורדינטות...)">
+        <select class="sel inp-full" id="dpUnit">${unitOpts}</select>
+        <div class="row">
+          <div style="flex:1">
+            <div class="sec-label" style="margin-bottom:4px">מספר יחידות</div>
+            <input type="number" class="inp inp-full" id="dpCount" placeholder="כמות" min="1" oninput="calcDeployCost()">
+          </div>
+          <div style="flex:1">
+            <div class="sec-label" style="margin-bottom:4px">עלות משוערת</div>
+            <div class="inp" id="dpCostPreview" style="color:var(--yellow);font-family:'DM Mono',monospace">—</div>
+          </div>
+        </div>
+        <textarea class="ta" id="dpMission" placeholder="תיאור המשימה / הוראות פעולה..."></textarea>
+        <select class="sel inp-full" id="dpUrgency">
+          <option value="standard">🟢 סטנדרטי</option>
+          <option value="priority">🟡 עדיפות</option>
+          <option value="emergency">🔴 חירום</option>
+        </select>
+        <button class="btn btn-danger btn-full" onclick="executeDeploy()">▶ שגר כוח</button>
+      </div>
+    </div>
+
+    <div class="sec-label">היסטוריית שגרים</div>
+    <div id="deployHistory">
+      ${history.length ? history.slice(0,20).map(d => `
+        <div style="border:1px solid var(--b1);border-right:3px solid ${d.urgency==='emergency'?'var(--red)':d.urgency==='priority'?'var(--yellow)':'var(--green)'};border-radius:var(--r2);padding:10px 12px;margin-bottom:7px;background:var(--glass)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:0.75rem;font-weight:600;color:var(--text)">${d.unitEmoji} ${d.unitName} × ${d.count}</span>
+            <span style="font-size:0.6rem;color:var(--dim);font-family:'DM Mono',monospace">${fmtDate(new Date(d.createdAt))}</span>
+          </div>
+          <div style="font-size:0.72rem;color:var(--acc2);margin-bottom:4px">📍 ${esc(d.location)}</div>
+          ${d.mission?`<div style="font-size:0.7rem;color:var(--dim);line-height:1.5">${esc(d.mission)}</div>`:''}
+          <div style="display:flex;justify-content:space-between;margin-top:7px">
+            <span style="font-size:0.62rem;color:var(--red);font-family:'DM Mono',monospace">עלות: ${fmtBTC(d.totalCost)}</span>
+            <span style="font-size:0.58rem;padding:1px 7px;border-radius:10px;background:${d.urgency==='emergency'?'rgba(239,68,68,0.15)':d.urgency==='priority'?'rgba(234,179,8,0.12)':'rgba(34,197,94,0.1)'};color:${d.urgency==='emergency'?'var(--red)':d.urgency==='priority'?'var(--yellow)':'var(--green)'}">${d.urgency==='emergency'?'🔴 חירום':d.urgency==='priority'?'🟡 עדיפות':'🟢 סטנדרטי'}</span>
+          </div>
+        </div>`).join('') : '<div class="empty">אין שגרים קודמים</div>'}
+    </div>`;
+}
+
+window.calcDeployCost = function() {
+  const sel = document.getElementById('dpUnit');
+  const count = parseInt(document.getElementById('dpCount')?.value) || 0;
+  const costPer = parseInt(sel?.selectedOptions?.[0]?.dataset?.cost || 0);
+  const total = costPer * count;
+  const prev = document.getElementById('dpCostPreview');
+  if (prev) prev.textContent = count > 0 ? fmtBTC(total) : '—';
+};
+
+window.executeDeploy = async function() {
+  const location = document.getElementById('dpLocation')?.value.trim();
+  const unitSel  = document.getElementById('dpUnit');
+  const count    = parseInt(document.getElementById('dpCount')?.value);
+  const mission  = document.getElementById('dpMission')?.value.trim();
+  const urgency  = document.getElementById('dpUrgency')?.value;
+
+  if (!location) { toast('נא להזין יעד','err'); return; }
+  if (!count || count < 1) { toast('נא להזין כמות','err'); return; }
+
+  const unitId   = unitSel.value;
+  const unit     = UNIT_TYPES.find(u => u.id === unitId);
+  const costPer  = unit.costPerUnit;
+  const total    = costPer * count;
+  const limit    = DEPLOY_LIMITS[agent.rankCode] ?? 1_000_000;
+
+  if (total > limit && limit !== Infinity) {
+    toast(`חריגה ממגבלת דרגה: ${fmtBTC(limit)}`,'err');
+    return;
+  }
+
+  // Check balance
+  const bal = await rtdbGetBalance(agent.agentId);
+  if (bal < total) { toast('יתרה לא מספקת','err'); return; }
+
+  if (!confirm(`אשר שגר: ${unit.emoji} ${unit.name} × ${count}\nיעד: ${location}\nעלות: ${fmtBTC(total)}`)) return;
+
+  // Deduct from bank
+  await charge(agent.agentId, -total, `שגר: ${unit.name} × ${count} → ${location}`);
+
+  // Save to RTDB
+  const deployRef = dbPush(dbRef(rtdb, `deployments/${agent.agentId}`));
+  await dbSet(deployRef, {
+    location, unitId, unitName: unit.name, unitEmoji: unit.emoji,
+    count, totalCost: total, mission: mission || '', urgency,
+    deployedBy: agent.codename, createdAt: Date.now()
+  });
+
+  toast(`${unit.emoji} ${unit.name} × ${count} שוגרו אל ${location}`,'ok');
+  refreshWin('bank');
+  refreshWin('deploy');
+};
+
+// ─────────────────────────────────────────────────────
+// TOHU
+// ─────────────────────────────────────────────────────
 function renderTohu(el){
   if(!el)el=document.getElementById('wb-tohu');if(!el)return;
   const active=tohuState?.active;
@@ -1386,9 +1585,130 @@ window.deactivateTohu=async function(){
   toast('קוד תוהו כובה','info');
 };
 
-/* ════════════════════════════════════════════════════════
-   COUNCIL APP
-════════════════════════════════════════════════════════ */
+// ─────────────────────────────────────────────────────
+// DEPLOY AGENTS
+// ─────────────────────────────────────────────────────
+// Transfer limits per rank (doubled each level from RECRUIT=1M)
+// RECRUIT=1M, SAMZAK=2M, MAZKAL=4M, MAFAE=8M, ALG=16M, PRESIDENT=∞
+// Same logic applies to deployment budget
+
+async function renderDeploy(el){
+  const myRankIdx = RANK_ORDER.indexOf(agent.rankCode);
+  const myLimit   = TRANSFER_LIMITS[agent.rankCode] ?? 1_000_000;
+
+  // Load existing deployments from RTDB
+  const depSnap = await dbGet(dbRef(rtdb,'deployments'));
+  const deps = [];
+  if(depSnap.exists()){
+    depSnap.forEach(child=>{
+      const d=child.val();
+      if(d.deployedBy===agent.agentId || myRankIdx>=RANK_ORDER.indexOf('ALG'))
+        deps.unshift({id:child.key,...d});
+    });
+  }
+
+  const teamSizes = [1,2,3,5,10,20,50];
+  const targets   = [
+    'נקודת מפגש','מחסן נשק','בסיס אויב','מתקן תקשורת',
+    'נמל','שדה תעופה','מרכז ממשלתי','מחנה אימונים'
+  ];
+
+  el.innerHTML=`
+    <div style="background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(79,70,229,0.04));border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+      <div style="font-size:2rem">🪖</div>
+      <div>
+        <div style="font-size:0.92rem;font-weight:700">שגרת סוכנים לתקיפה</div>
+        <div style="font-size:0.62rem;color:var(--dim);margin-top:2px">תקציב מרבי: <span style="color:var(--yellow);font-weight:700">${fmtBTC(myLimit)}</span> · דרגה: ${agent.rank}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">פרט שגרה חדשה</div>
+      <div class="col">
+        <div class="row">
+          <select class="sel" style="flex:1" id="depTarget">
+            ${targets.map(t=>`<option value="${t}">${t}</option>`).join('')}
+            <option value="מיקום מותאם">מיקום מותאם...</option>
+          </select>
+          <input type="text" class="inp" id="depCustomTarget" placeholder="מיקום מותאם" style="flex:1;display:none">
+        </div>
+        <input type="text" class="inp inp-full" id="depLocation" placeholder="כתובת / קואורדינטות / תיאור המיקום">
+        <div class="row">
+          <select class="sel" style="flex:1" id="depTeamSize">
+            ${teamSizes.map(s=>`<option value="${s}">${s} סוכנים</option>`).join('')}
+          </select>
+          <select class="sel" style="flex:1" id="depMission">
+            <option value="חדירה">חדירה</option>
+            <option value="חילוץ">חילוץ</option>
+            <option value="ביון">ביון</option>
+            <option value="חיסול">חיסול</option>
+            <option value="הגנה">הגנה</option>
+            <option value="סיור">סיור</option>
+          </select>
+        </div>
+        <input type="number" class="inp inp-full" id="depBudget" placeholder="תקציב משימה (₿)" max="${myLimit}">
+        <textarea class="ta" id="depNotes" placeholder="הערות / ציוד נדרש / הוראות מיוחדות..."></textarea>
+        <div style="font-size:0.65rem;color:var(--dim);padding:6px 0">⚠ הכסף יחויב מחשבונך · מגבלה: ${fmtBTC(myLimit)}</div>
+        <button class="btn btn-pri" onclick="deployAgents()">🪖 שגר יחידה</button>
+      </div>
+    </div>
+
+    <div class="sec-label">שגרות פעילות</div>
+    ${deps.length?deps.map(d=>`
+      <div style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.15);border-right:3px solid var(--acc);border-radius:8px;padding:11px 13px;margin-bottom:7px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:0.68rem;font-weight:700;color:var(--acc2)">🪖 ${esc(d.mission||'')} · ${d.teamSize} סוכנים</span>
+          <span style="font-size:0.6rem;color:var(--dim)">${d.createdAt?fmtDate(new Date(d.createdAt)):'—'}</span>
+        </div>
+        <div style="font-size:0.8rem;font-weight:600;margin-bottom:3px">📍 ${esc(d.target||'')}${d.location?' — '+esc(d.location):''}</div>
+        ${d.notes?`<div style="font-size:0.7rem;color:var(--dim);line-height:1.5;margin-bottom:6px">${esc(d.notes)}</div>`:''}
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:0.65rem;color:var(--dim)">שוגר ע"י ${AGENTS[d.deployedBy]?.codename||d.deployedBy}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--yellow)">${fmtBTC(d.budget||0)}</span>
+        </div>
+      </div>`).join(''):'<div class="empty">אין שגרות פעילות</div>'}`;
+
+  // custom target toggle
+  document.getElementById('depTarget')?.addEventListener('change',function(){
+    const ci=document.getElementById('depCustomTarget');
+    if(ci) ci.style.display=this.value==='מיקום מותאם'?'block':'none';
+  });
+}
+
+window.deployAgents=async function(){
+  const targetSel = document.getElementById('depTarget')?.value;
+  const customTgt = document.getElementById('depCustomTarget')?.value.trim();
+  const target    = targetSel==='מיקום מותאם'?(customTgt||'לא צוין'):targetSel;
+  const location  = document.getElementById('depLocation')?.value.trim();
+  const teamSize  = parseInt(document.getElementById('depTeamSize')?.value)||1;
+  const mission   = document.getElementById('depMission')?.value;
+  const budget    = parseFloat(document.getElementById('depBudget')?.value)||0;
+  const notes     = document.getElementById('depNotes')?.value.trim();
+
+  const limit = TRANSFER_LIMITS[agent.rankCode]??1_000_000;
+  if(budget>0 && budget>limit){toast('תקציב חורג ממגבלת הדרגה: '+fmtBTC(limit),'err');return;}
+
+  if(budget>0){
+    const bal=await rtdbGetBalance(agent.agentId);
+    if(bal<budget){toast('יתרה לא מספקת','err');return;}
+    await charge(agent.agentId,-budget,'תקציב שגרה: '+mission+' ל-'+target);
+  }
+
+  const depRef=dbPush(dbRef(rtdb,'deployments'));
+  await dbSet(depRef,{
+    target,location:location||'',teamSize,mission,budget:budget||0,
+    notes:notes||'',deployedBy:agent.agentId,
+    status:'active',createdAt:Date.now()
+  });
+
+  toast('יחידה שוגרה: '+teamSize+' סוכנים → '+target,'ok');
+  refreshWin('deploy');
+  if(budget>0) refreshWin('bank');
+};
+
+// ─────────────────────────────────────────────────────
+// COUNCIL
+// ─────────────────────────────────────────────────────
 function renderCouncil(el){
   el.innerHTML=`
     <div class="council-banner">
@@ -1409,9 +1729,9 @@ function renderCouncil(el){
     </div>`;
 }
 
-/* ════════════════════════════════════════════════════════
-   G-PASS APP
-════════════════════════════════════════════════════════ */
+// ─────────────────────────────────────────────────────
+// G-PASS
+// ─────────────────────────────────────────────────────
 async function renderGpass(el){
   const snap=await getDocs(query(collection(db,'gpasses'),orderBy('createdAt','desc')));
   const passes=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -1461,13 +1781,16 @@ window.revokeGpass=async function(id){
   renderGpass(document.getElementById('wb-gpass'));
 };
 
-/* ════════════════════════════════════════════════════════
-   UTILS
-════════════════════════════════════════════════════════ */
+// ─────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────
 function fmtBTC(n){
-  const v=Number(n);
-  const s=v<0?'-':'';
-  return s+Math.abs(v).toLocaleString('en-US')+' ₿';
+  const v=Number(n);const a=Math.abs(v);const s=v<0?'-':'';
+  if(a>=1e15)return s+(a/1e15).toFixed(2)+' Q₿';
+  if(a>=1e12)return s+(a/1e12).toFixed(2)+' T₿';
+  if(a>=1e9) return s+(a/1e9).toFixed(2)+' B₿';
+  if(a>=1e6) return s+(a/1e6).toFixed(2)+' M₿';
+  return s+v.toLocaleString()+' ₿';
 }
 function fmtDate(d){return d.toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
